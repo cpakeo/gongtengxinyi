@@ -20,7 +20,7 @@ def get_horoscope(config_data):
                                   'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
                 }
                 response = get(url, headers=headers, timeout=15).json()
-                print(f"星座接口返回:{response}")
+                print("星座接口返回:{}".format(response))
                 if response.get("code") == 200:
                     res_data = response.get("result", {})
                     if res_data.get("list") and len(res_data["list"]) > 0:
@@ -31,7 +31,7 @@ def get_horoscope(config_data):
                 else:
                     horoscope = "暂无星座运势"
             except Exception as e:
-                print(f"星座获取异常 {k}:{e}")
+                print("星座获取异常 {}:{}".format(k, e))
                 horoscope = "暂无星座运势"
             horoscope_data[k] = horoscope
     return horoscope_data
@@ -253,7 +253,7 @@ def get_tian_note(config):
                           'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
         }
         response = get(url, headers=headers, timeout=15)
-        print("天行金句原始返回：", response.text)
+        print("天行金句原始返回：{}".format(response.text))
         result = response.json()
         if result.get("code") == 200 and result.get("result"):
             item = result["result"]
@@ -414,7 +414,6 @@ def handler(event, context):
 
     note_ch = config["note_ch"]
     note_en = config["note_en"]
-    # 优先天行金句
     if note_ch == "" and note_en == "":
         note_ch, note_en = get_tian_note(config)
         if note_ch == "" or note_en == "":

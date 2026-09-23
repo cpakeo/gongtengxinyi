@@ -297,8 +297,9 @@ def get_ciba():
                           'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
         }
         r = get(url, headers=headers, timeout=10)
-        note_en = r.json()["content"]
-        note_ch = r.json()["note"]
+        res_data = r.json()
+        note_en = res_data["content"]
+        note_ch = res_data["note"]
     except Exception as e:
         print("词霸接口获取失败：", e)
     return note_ch, note_en
@@ -328,11 +329,27 @@ def get_tian_note(config):
             note_ch = res.get("note", "")
     except Exception as e:
         print("天行金句POST调用异常：", e)
-    # 兜底，无论天行成功失败，一定有金句输出
+
+    # 第一步兜底：调用词霸
     if not note_ch or not note_en:
         print("天行金句无数据，启用词霸兜底")
         note_ch, note_en = get_ciba()
+
+    # ✅终极兜底：词霸也超时/失败，使用内置备用金句列表，保证绝不空白
+    backup_list = [
+        ("保持热爱，奔赴山海", "Keep loving, keep going."),
+        ("凡心所向，素履以往", "Follow your heart, and you will find your way."),
+        ("生活明朗，万物可爱", "Life is bright and everything is lovely."),
+        ("慢慢来，好戏都在烟火里", "Take your time, good things are in ordinary life."),
+        ("愿你历尽千帆，归来仍是少年", "May you return as a youth after all your journeys.")
+    ]
+    if not note_ch or not note_en:
+        import random
+        print("⚠️词霸也失效，启用本地内置金句！")
+        note_ch, note_en = random.choice(backup_list)
+
     return note_ch, note_en
+
 
 
 

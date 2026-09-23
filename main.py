@@ -385,9 +385,9 @@ def send_message(to_user, access_token, region_name, weather, temp, max_temp, mi
                 "value": temp,
                 "color": color("color_temp", config)
             },
-            "wind_dir": {
-                "value": wind_dir,
-                "color": color("color_wind_dir", config)
+            "wind": {
+               "value": wind_dir,
+               "color": color("color_wind", config)
             },
             "wind_scale": {
                 "value": f"{windScale}级" if windScale else "",

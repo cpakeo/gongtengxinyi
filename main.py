@@ -181,8 +181,20 @@ def get_weather(region, config):
     sunrise = response["daily"][0]["sunrise"]
     # 日落时间
     sunset = response["daily"][0]["sunset"]
-    # 【新增】紫外线强度指数
-    uv = response["daily"][0].get("uvIndexMax", "")
+
+    # ==========【修复紫外线：单独调用指数接口，拿到指数+文字描述】==========
+    uv = "无数据"
+    try:
+        index_url = "https://devapi.qweather.com/v7/indices/1d?location={}&key={}&type=5".format(location_id, key)
+        index_resp = get(index_url, headers=headers, timeout=10).json()
+        if index_resp["code"] == "200":
+            uv_level = index_resp["daily"][0]["level"]
+            uv_text = index_resp["daily"][0]["name"]
+            uv = f"{uv_level}（{uv_text}）"
+    except Exception as e:
+        print("紫外线获取失败:", e)
+        uv = "无"
+    # ======================================================================
 
     # ===== 逐小时预报 24h（获取降雨概率） =====
     rain_prob = ""

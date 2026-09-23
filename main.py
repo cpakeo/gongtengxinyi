@@ -19,6 +19,7 @@ def get_horoscope(config_data):
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
                 }
                 response = get(url, headers=headers, timeout=10).json()
+                print(f"星座接口返回：{response}")
                 if response["code"] == 200:
                     horoscope = response["newslist"][0]["content"]
                 else:
@@ -248,8 +249,7 @@ def get_ciba():
         print("词霸获取失败：", e)
     return note_ch, note_en
 
-
-# 天行每日英语（everyday/index）修复版，增加日志打印
+# =========修复天行每日英语 【重点！天行everyday返回newslist数组】=========
 def get_tian_note(config):
     note_ch = ""
     note_en = ""
@@ -268,12 +268,10 @@ def get_tian_note(config):
         result = response.json()
 
         if result.get("code") == 200:
-            if result.get("result"):
-                note_en = result["result"].get("content", "")
-                note_ch = result["result"].get("note", "")
-            elif result.get("newslist") and len(result["newslist"]) > 0:
-                note_en = result["newslist"][0].get("content", "")
-                note_ch = result["newslist"][0].get("note", "")
+            if result.get("newslist") and len(result["newslist"]) > 0:
+                item = result["newslist"][0]
+                note_en = item.get("content", "")
+                note_ch = item.get("note", "")
             print(f"✅天行金句解析成功：中文：{note_ch}，英文：{note_en}")
         else:
             print(f"❌天行金句接口返回code异常：{result}")
@@ -448,7 +446,7 @@ def handler(event, context):
     region = config["region"]
     weather, temp, max_temp, min_temp, wind_dir, rain, rain_prob, wet, uv, sunrise, sunset, pm2p5, proposal = get_weather(region, config)
 
-    # 【核心修改：直接读取天行金句，不再读取config里note_ch/note_en覆盖】
+    # 天行金句优先
     note_ch, note_en = get_tian_note(config)
     # 天行失败，词霸兜底
     if not note_ch or not note_en:

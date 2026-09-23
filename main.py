@@ -10,6 +10,7 @@ import os
 
 def get_horoscope(config_data):
     horoscope_data = {}
+    # 遍历config里面所有horoscope开头的配置，例如 horoscope1: "taurus"
     for k, v in config_data.items():
         if k.startswith("horoscope"):
             try:
@@ -19,12 +20,10 @@ def get_horoscope(config_data):
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
                 }
                 response = get(url, headers=headers, timeout=10).json()
-                print(f"星座接口返回：{response}")
                 if response["code"] == 200:
                     horoscope = response["newslist"][0]["content"]
                 else:
                     horoscope = "暂无星座运势"
-                    print(f"星座接口返回错误: {response}")
             except Exception as e:
                 print(f"星座获取异常 {k}:", e)
                 horoscope = "暂无星座运势"

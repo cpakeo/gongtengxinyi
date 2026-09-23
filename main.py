@@ -13,17 +13,12 @@ user_list = cfg["user"]
 weather_key = cfg["weather_key"]
 tx_key = cfg["tianxing_key"]
 city_name = cfg["city"]
-love_start = cfg["love_start_date"]
-b1_name = cfg["birthday1_name"]
-b1_date = cfg["birthday1"]
-b2_name = cfg["birthday2_name"]
-b2_date = cfg["birthday2"]
-astro_name = cfg["astro"]
+b_name = cfg["birthday_name"]
+b_date = cfg["birthday"]
+astro_code = cfg["astro"]
 
-# 星期映射
-week_map = {0:"星期一",1:"星期二",2:"星期三",3:"星期四",4:"星期五",5:"星期六",6:"星期日"}
 
-# 获取微信access_token
+# 获取微信 access_token
 def get_access_token():
     url = f"https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid={app_id}&secret={app_secret}"
     res = requests.get(url)
@@ -35,12 +30,12 @@ def get_access_token():
         print("获取token失败", data)
         return None
 
+
 # 获取和风城市ID
 def get_city_id(city):
     url = f"https://api.qweather.com/v2/city/lookup?location={city}&key={weather_key}"
     resp = requests.get(url)
     print(f"和风天气请求，HTTP状态码：{resp.status_code}")
-    print(f"返回内容：{resp.text}")
     if resp.status_code != 200:
         print("和风城市查询请求失败")
         return None
@@ -51,7 +46,8 @@ def get_city_id(city):
         print("获取城市id失败", res)
         return None
 
-# 获取全部天气数据（实况、3天预报、日出日落、生活指数）
+
+# 获取天气全部数据（实况、空气质量、日出日落、生活指数）
 def get_weather_info(city_id):
     # 实况天气
     now_api = f"https://api.qweather.com/v7/weather/now?location={city_id}&key={weather_key}"
@@ -62,103 +58,108 @@ def get_weather_info(city_id):
     # 日出日落
     sun_api = f"https://api.qweather.com/v7/astronomy/sun?location={city_id}&key={weather_key}"
     sun_res = requests.get(sun_api).json()
-    # 生活指数（穿衣提示）
-    index_api = f"https://api.qweather.com/v7/indices/1d?location={city_id}&key={weather_key}&type=3"
+    # 空气质量（PM2.5）
+    air_api = f"https://api.qweather.com/v7/air/now?location={city_id}&key={weather_key}"
+    air_res = requests.get(air_api).json()
+    # 生活指数提示
+    index_api = f"https://api.qweather.com/v7/indices/1d?location={city_id}&key={weather_key}&type=5"
     index_res = requests.get(index_api).json()
 
     now = now_res["now"]
-    today_day = day3_res["daily"][0]
+    today = day3_res["daily"][0]
     sunrise = sun_res["sunrise"].split("T")[1]
     sunset = sun_res["sunset"].split("T")[1]
-    dress_tip = index_res["daily"][0]["text"]
+    pm25 = air_res["now"].get("pm2p5", "--")
+    tip_text = index_res["daily"][0]["text"]
 
     data = {
-        "date": datetime.now().strftime("%Y-%m-%d"),
-        "week": week_map[datetime.now().weekday()],
+        "date": datetime.now().strftime("%m-%d"),
         "city": city_name,
         "weather": now["text"],
         "temp": now["temp"],
-        "maxTemperature": today_day["tempMax"],
-        "minTemperature": today_day["tempMin"],
+        "maxTemperature": today["tempMax"],
+        "minTemperature": today["tempMin"],
         "windDir": now["windDir"],
-        "windScale": now["windScale"],
         "precip": now["precip"],
-        "pop": today_day["pop"],
+        "pop": today["pop"],
         "humidity": now["humidity"],
-        "uv": today_day["uvIndex"],
+        "uv": today["uvIndex"],
+        "pm25": pm25,
         "sunrise": sunrise,
         "sunset": sunset,
-        "dress_tip": dress_tip
+        "tip": tip_text
     }
     return data
 
-# 计算天数：恋爱天数、生日倒计时
-def calc_day_count():
+
+# 计算生日倒计时、距离新年倒计时
+def calc_countdown():
     today = date.today()
-    # 在一起天数
-    love_dt = datetime.strptime(love_start, "%Y-%m-%d").date()
-    love_days = (today - love_dt).days
-    # 生日1倒计时
-    b1 = datetime.strptime(b1_date, "%Y-%m-%d").date()
-    next_b1 = b1.replace(year=today.year)
-    if next_b1 < today:
-        next_b1 = next_b1.replace(year=today.year+1)
-    b1_left = (next_b1 - today).days
-    # 生日2倒计时
-    b2 = datetime.strptime(b2_date, "%Y-%m-%d").date()
-    next_b2 = b2.replace(year=today.year)
-    if next_b2 < today:
-        next_b2 = next_b2.replace(year=today.year+1)
-    b2_left = (next_b2 - today).days
-    return love_days, b1_left, b2_left
+    # 生日倒计时
+    birth = datetime.strptime(b_date, "%Y-%m-%d").date()
+    next_birth = birth.replace(year=today.year)
+    if next_birth < today:
+        next_birth = next_birth.replace(year=today.year + 1)
+    birth_left = (next_birth - today).days
 
-# 天行API：星座运势 + 中英文金句
-def get_tianxing_data():
-    # 星座运势
-    url_horo = f"https://api.tianapi.com/star/index?key={tx_key}&astro={astro_name}"
-    horo_resp = requests.get(url_horo).json()
-    horoscope = horo_resp["newslist"][0]["content"]
-    # 每日一句中英文
-    url_sentence = f"https://api.tianapi.com/en/index?key={tx_key}"
-    sen_resp = requests.get(url_sentence).json()
-    zh_text = sen_resp["newslist"][0]["zh"]
-    en_text = sen_resp["newslist"][0]["en"]
-    return horoscope, zh_text, en_text
+    # 距离下一年元旦倒计时
+    new_year = date(today.year + 1, 1, 1)
+    new_year_left = (new_year - today).days
+    return birth_left, new_year_left
 
-# 发送微信模板消息
-def send_wechat_msg(token, openid, weather, love_days, b1_left, b2_left, horoscope, zh_sentence, en_sentence):
+
+# 天行API获取巨蟹座星座运势 + 每日金句
+def get_tianxing():
+    try:
+        url_horo = f"https://api.tianapi.com/star/index?key={tx_key}&astro={astro_code}"
+        horo_resp = requests.get(url_horo, timeout=10).json()
+        horo_text = horo_resp["newslist"][0]["content"]
+    except Exception as e:
+        print("星座获取失败：", e)
+        horo_text = "暂无星座运势"
+
+    try:
+        url_sentence = f"https://api.tianapi.com/en/index?key={tx_key}"
+        sen_resp = requests.get(url_sentence, timeout=10).json()
+        zh = sen_resp["newslist"][0]["zh"]
+    except Exception as e:
+        print("金句获取失败：", e)
+        zh = ""
+    return horo_text, zh
+
+
+# 推送微信模板消息
+def send_msg(token, openid, weather, birth_left, new_year_left, horoscope, zh_sentence):
     url = f"https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={token}"
     post_data = {
         "touser": openid,
         "template_id": template_id,
         "data": {
-            "first": {"value": "xxx早上好呀！", "color": "#000000"},
-            "date": {"value": f"{weather['date']} {weather['week']}", "color": cfg["color_date"]},
-            "tip": {"value": "今天又是元气满满的一天啦！开心一点！", "color": "#000000"},
+            "first": {"value": "新一，早上好啊🌞", "color": "#000000"},
+            "date": {"value": weather["date"], "color": cfg["color_date"]},
             "region": {"value": weather["city"], "color": cfg["color_region"]},
             "weather": {"value": weather["weather"], "color": cfg["color_weather"]},
             "temp_now": {"value": f"{weather['temp']}℃", "color": cfg["color_temp"]},
             "temp_max": {"value": f"{weather['maxTemperature']}℃", "color": cfg["color_max_temp"]},
             "temp_min": {"value": f"{weather['minTemperature']}℃", "color": cfg["color_min_temp"]},
-            "wind_info": {"value": f"{weather['windDir']} {weather['windScale']}级", "color": cfg["color_wind"]},
-            "precip": {"value": f"{weather['precip']}", "color": "#000000"},
+            "wind": {"value": weather["windDir"], "color": cfg["color_wind"]},
+            "precip": {"value": f"{weather['precip']}mm", "color": "#000000"},
             "pop": {"value": f"{weather['pop']}%", "color": "#000000"},
             "humidity": {"value": f"{weather['humidity']}%", "color": "#000000"},
-            "uv": {"value": f"{weather['uv']}", "color": "#000000"},
+            "uv": {"value": f"{weather['uv']}（紫外线指数）", "color": "#000000"},
+            "pm25": {"value": weather["pm25"], "color": "#000000"},
             "sunrise": {"value": weather["sunrise"], "color": "#000000"},
             "sunset": {"value": weather["sunset"], "color": "#000000"},
-            "love_day": {"value": f"{love_days}", "color": "#000000"},
-            "birth1": {"value": f"{b1_left}", "color": "#000000"},
-            "birth2": {"value": f"{b2_left}", "color": "#000000"},
-            "dress_tip": {"value": weather["dress_tip"], "color": "#000000"},
             "horoscope": {"value": horoscope, "color": "#000000"},
-            "note_zh": {"value": zh_sentence, "color": cfg["color_note_ch"]},
-            "note_en": {"value": en_sentence, "color": cfg["color_note_en"]},
-            "footer": {"value": "--来自xxx的问候", "color": "#000000"}
+            "birth_day": {"value": f"距离{b_name}的生日还有{birth_left}天", "color": "#000000"},
+            "new_year": {"value": f"{new_year_left}", "color": "#000000"},
+            "tip": {"value": weather["tip"], "color": "#000000"},
+            "sentence": {"value": zh_sentence, "color": cfg["color_note_ch"]}
         }
     }
     res = requests.post(url, json=post_data)
-    print("推送返回结果：", res.json())
+    print("推送结果：", res.json())
+
 
 if __name__ == "__main__":
     print("=====开始执行每日推送=====")
@@ -169,8 +170,8 @@ if __name__ == "__main__":
     if not cityid:
         exit(1)
     weather_data = get_weather_info(cityid)
-    love_days, b1_left, b2_left = calc_day_count()
-    horoscope, zh_note, en_note = get_tianxing_data()
-    for wx_user in user_list:
-        send_wechat_msg(access_token, wx_user, weather_data, love_days, b1_left, b2_left, horoscope, zh_note, en_note)
-    print("✅全部推送任务完成！")
+    birth_left_days, new_year_left_days = calc_countdown()
+    horoscope_text, sentence_zh = get_tianxing()
+    for user in user_list:
+        send_msg(access_token, user, weather_data, birth_left_days, new_year_left_days, horoscope_text, sentence_zh)
+    print("✅推送完成")

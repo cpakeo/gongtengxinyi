@@ -34,5 +34,5 @@
   "color_horoscope1": "#000000",
   "color_countdown1": "#000000",
   "color_countdown2": "#000000",
-  "template": "新一，早上好啊🌞\n{{date.DATA}} 今天又是元气满满的一天啦！开心一点！\n地区：{{region.DATA}}\n天气：{{weather.DATA}}\n当前气温：{{temp.DATA}}\n最高温：{{max_temp.DATA}}　　最低温：{{min_temp.DATA}}\n风向：{{wind.DATA}}\n降雨量：{{rain.DATA}}　　降雨概率：{{rain_prob.DATA}}\n相对湿度：{{wet.DATA}}　　紫外线强度指数：{{uv.DATA}}\nPM2.5：{{pm2p5.DATA}}\n日出时间：{{sunrise.DATA}}　　日落时间：{{sunset.DATA}}\n星座运势：{{horoscope1.DATA}}\n{{birthday2.DATA}}\n新的一年还有：{{countdown1.DATA}}\n温馨提示：{{proposal.DATA}}\n想说：\n{{note.DATA}}\n{{content.DATA}}"
+  "template": "新一，早上好啊🌞\n{{date.DATA}} 今天又是元气满满的一天啦！开心一点！\n地区：{{region.DATA}}\n天气：{{weather.DATA}}\n当前气温：{{temp.DATA}}\n最高温：{{max_temp.DATA}}　　最低温：{{min_temp.DATA}}\n风向：{{wind.DATA}}\n降雨量：{{rain.DATA}}　　降雨概率：{{rain_prob.DATA}}\n相对湿度：{{wet.DATA}}　　紫外线强度指数：{{uv.DATA}}\nPM2.5：{{pm2p5.DATA}}\n日出时间：{{sunrise.DATA}}　　日落时间：{{sunset.DATA}}\n星座运势：{{horoscope1.DATA}}\n{{birthday2.DATA}}\n新的一年还有：{{countdown1.DATA}}\n温馨提示：{{proposal.DATA}}\n想说：\n{{note_ch.DATA}}\n{{note_en.DATA}}"
 }

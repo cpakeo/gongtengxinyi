@@ -173,6 +173,7 @@ def get_weather(region, config):
     # ===== 逐日预报 3d =====
     url = "https://devapi.qweather.com/v7/weather/3d?location={}&key={}".format(location_id, key)
     response = get(url, headers=headers).json()
+    print("3d天气接口返回code：",response["code"])
     # 最高气温
     max_temp = response["daily"][0]["tempMax"] + u"\N{DEGREE SIGN}" + "C"
     # 最低气温
@@ -181,8 +182,6 @@ def get_weather(region, config):
     sunrise = response["daily"][0]["sunrise"]
     # 日落时间
     sunset = response["daily"][0]["sunset"]
-    # 【新增】紫外线强度指数
-    uv = response["daily"][0].get("uvIndexMax", "")
 
     # ===== 逐小时预报 24h（获取降雨概率） =====
     rain_prob = ""
@@ -207,7 +206,18 @@ def get_weather(region, config):
         category = ""
         pm2p5 = ""
 
-    # ===== 生活指数 =====
+    # ===== 生活指数 【这里获取紫外线 type=5 紫外线指数】=====
+    uv = "无"
+    try:
+        index_url = "https://devapi.qweather.com/v7/indices/1d?location={}&key={}&type=5".format(location_id, key)
+        index_resp = get(index_url, headers=headers).json()
+        if index_resp["code"] == "200":
+            uv = index_resp["daily"][0].get("level","无")
+    except Exception:
+        uv = "无"
+    print("紫外线指数：",uv)
+
+    # ===== 随机生活提示（原来的proposal） =====
     id = random.randint(1, 16)
     url = "https://devapi.qweather.com/v7/indices/1d?location={}&key={}&type={}".format(location_id, key, id)
     response = get(url, headers=headers).json()
@@ -217,6 +227,7 @@ def get_weather(region, config):
 
     # 返回值新增 rain, rain_prob, wet, uv
     return weather, temp, max_temp, min_temp, wind_dir, rain, rain_prob, wet, uv, sunrise, sunset, category, pm2p5, proposal
+
 
 
 def get_tianhang(config):

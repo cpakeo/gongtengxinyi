@@ -132,26 +132,36 @@ def get_weather(region, config):
     key = config["weather_key"]
     region_url = "https://api.qweather.com/v2/city/lookup?location={}&key={}".format(region, key)
     response = get(region_url, headers=headers, timeout=15)
-    print("城市查询返回文本：", response.text)
+    print("====城市查询status_code：", response.status_code)
+    print("====城市查询返回原始文本：|", response.text, "|")
     try:
         res_json = response.json()
     except Exception as e:
         print("城市接口JSON解析失败！", e)
-        sys.exit(1)
+        # 接口异常，返回空值，不直接退出程序
+        return "", "", "", "", "", "", "", "", "", "", "", "", "", ""
 
     if res_json["code"] == "404":
-        print("推送消息失败，请检查地区名是否有误！")
-        sys.exit(1)
+        print("地区名称错误！")
+        return "", "", "", "", "", "", "", "", "", "", "", "", "", ""
     elif res_json["code"] == "401":
-        print("推送消息失败，请检查和风天气key是否正确！")
-        sys.exit(1)
+        print("和风key错误或者权限不足！")
+        return "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+    elif res_json["code"] != "200":
+        print("和风接口异常，code=", res_json["code"])
+        return "", "", "", "", "", "", "", "", "", "", "", "", "", ""
     else:
         location_id = res_json["location"][0]["id"]
 
     weather_url = "https://api.qweather.com/v7/weather/now?location={}&key={}".format(location_id, key)
     response = get(weather_url, headers=headers, timeout=15)
-    print("实时天气返回文本：", response.text)
-    res_json = response.json()
+    print("====实时天气返回文本：", response.text)
+    try:
+        res_json = response.json()
+    except Exception as e:
+        print("实时天气接口解析失败", e)
+        return "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+
     weather = res_json["now"]["text"]
     temp = res_json["now"]["temp"] + u"\N{DEGREE SIGN}" + "C"
     wind_dir = res_json["now"]["windDir"]
@@ -162,16 +172,24 @@ def get_weather(region, config):
 
     url = "https://api.qweather.com/v7/weather/3d?location={}&key={}".format(location_id, key)
     response = get(url, headers=headers, timeout=15)
-    print("3天预报返回文本：", response.text)
-    res_json = response.json()
-    max_temp = res_json["daily"][0]["tempMax"] + u"\N{DEGREE SIGN}" + "C"
-    min_temp = res_json["daily"][0]["tempMin"] + u"\N{DEGREE SIGN}" + "C"
-    sunrise = res_json["daily"][0]["sunrise"]
-    sunset = res_json["daily"][0]["sunset"]
+    print("====3天预报返回文本：", response.text)
+    try:
+        res_json = response.json()
+    except Exception as e:
+        print("3天预报解析失败", e)
+        max_temp = ""
+        min_temp = ""
+        sunrise = ""
+        sunset = ""
+    else:
+        max_temp = res_json["daily"][0]["tempMax"] + u"\N{DEGREE SIGN}" + "C"
+        min_temp = res_json["daily"][0]["tempMin"] + u"\N{DEGREE SIGN}" + "C"
+        sunrise = res_json["daily"][0]["sunrise"]
+        sunset = res_json["daily"][0]["sunset"]
 
     url = "https://api.qweather.com/v7/air/now?location={}&key={}".format(location_id, key)
     response = get(url, headers=headers, timeout=15)
-    print("空气质量返回文本：", response.text)
+    print("====空气质量返回文本：", response.text)
     try:
         res_json = response.json()
         if res_json["code"] == "200":
@@ -187,7 +205,7 @@ def get_weather(region, config):
     id = random.randint(1, 16)
     url = "https://api.qweather.com/v7/indices/1d?location={}&key={}&type={}".format(location_id, key, id)
     response = get(url, headers=headers, timeout=15)
-    print("指数接口返回文本：", response.text)
+    print("====指数接口返回文本：", response.text)
     try:
         res_json = response.json()
         proposal = ""
@@ -197,6 +215,7 @@ def get_weather(region, config):
         proposal = ""
 
     return weather, temp, max_temp, min_temp, wind_dir, sunrise, sunset, category, pm2p5, proposal, precip, windScale, humidity, uvIndex
+
 
 
 def get_tianhang(config):

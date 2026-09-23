@@ -1,7 +1,7 @@
 {
 "app_id": "wxb9453a69bd47150c",
 "app_secret": "7b1deffb7759389d4406f842901062bc",
-"template_id": "22tZ2HCNZkzvXHfaJ81tZ0NWaLKp5dQM1SqayMlsIdg",
+"template_id": "sTF7Q8w0Nb_6fFiXILptjj5zTjq7TOr92j8l66hzoDc",
 "user": ["ojTUH3PKvrLTQXv8JLSY1L8yj4kk"],
 "weather_key": "9d7ad6f0e80b45849864d1392c1ebe03",
 "tian_api": "6c81ddd76d8c6c984084e872482edaa4",

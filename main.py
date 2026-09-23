@@ -162,7 +162,7 @@ def get_weather(region, config):
     weather = response["now"]["text"]
     # 当前温度
     temp = response["now"]["temp"] + u"\N{DEGREE SIGN}" + "C"
-   # 风向
+    # 风向
     wind_dir = response["now"]["windDir"]
     # 【新增】风力等级
     windScale = response["now"]["windScale"]
@@ -364,35 +364,97 @@ def send_message(to_user, access_token, region_name, weather, temp, max_temp, mi
         if k[0:5] == "birth":
             birthdays[k] = v
     data = {
-    "touser": to_user,
-    "template_id": config["template_id"],
-    "url": "http://weixin.qq.com/download",
-    "topcolor": "#FF0000",
-    "data": {
-        "date": {"value": "{} {}".format(today, week), "color": color("color_date", config)},
-        "region": {"value": region_name, "color": color("color_region", config)},
-        "weather": {"value": weather, "color": color("color_weather", config)},
-        "temp": {"value": temp, "color": color("color_temp", config)},
-        "max_temp": {"value": max_temp, "color": color("color_max_temp", config)},
-        "min_temp": {"value": min_temp, "color": color("color_min_temp", config)},
-        "wind": {"value": wind_dir, "color": color("color_wind", config)},
-        "wind_scale": {"value": f"{windScale}级" if windScale else "", "color": color("color_wind_scale", config)},
-        "rain": {"value": rain, "color": color("color_weather", config)},
-        "rain_prob": {"value": rain_prob, "color": color("color_weather", config)},
-        "wet": {"value": wet, "color": color("color_weather", config)},
-        "uv": {"value": uv, "color": color("color_weather", config)},
-        "pm2p5": {"value": pm2p5, "color": color("color_pm2p5", config)},
-        "sunrise": {"value": sunrise, "color": color("color_sunrise", config)},
-        "sunset": {"value": sunset, "color": color("color_sunset", config)},
-        "horoscope1": {"value": horoscope1, "color": color("color_region", config)},
-        "birthday2": {"value": birthday2, "color": color("color_region", config)},
-        "countdown1": {"value": countdown1, "color": color("color_region", config)},
-        "proposal": {"value": proposal, "color": color("color_weather", config)},
-        "note_ch": {"value": note_ch, "color": color("color_note_ch", config)},
-        "note_en": {"value": note_en, "color": color("color_note_en", config)}
+        "touser": to_user,
+        "template_id": config["template_id"],
+        "url": "http://weixin.qq.com/download",
+        "topcolor": "#FF0000",
+        "data": {
+            "date": {
+                "value": "{} {}".format(today, week),
+                "color": color("color_date", config)
+            },
+            "region": {
+                "value": region_name,
+                "color": color("color_region", config)
+            },
+            "weather": {
+                "value": weather,
+                "color": color("color_weather", config)
+            },
+            "temp": {
+                "value": temp,
+                "color": color("color_temp", config)
+            },
+            "wind_dir": {
+                "value": wind_dir,
+                "color": color("color_wind_dir", config)
+            },
+            "wind_scale": {
+                "value": f"{windScale}级" if windScale else "",
+                "color": color("color_wind_scale", config)
+            },
+            "rain": {
+                "value": rain,
+                "color": color("color_weather", config)
+            },
+            "rain_prob": {
+                "value": rain_prob,
+                "color": color("color_weather", config)
+            },
+            "wet": {
+                "value": wet,
+                "color": color("color_weather", config)
+            },
+            "uv": {
+                "value": uv,
+                "color": color("color_weather", config)
+            },
+            "note_en": {
+                "value": note_en,
+                "color": color("color_note_en", config)
+            },
+            "note_ch": {
+                "value": note_ch,
+                "color": color("color_note_ch", config)
+            },
+            "max_temp": {
+                "value": max_temp,
+                "color": color("color_max_temp", config)
+            },
+            "min_temp": {
+                "value": min_temp,
+                "color": color("color_min_temp", config)
+            },
+            "sunrise": {
+                "value": sunrise,
+                "color": color("color_sunrise", config)
+            },
+            "sunset": {
+                "value": sunset,
+                "color": color("color_sunset", config)
+            },
+            "category": {
+                "value": category,
+                "color": color("color_category", config)
+            },
+            "pm2p5": {
+                "value": pm2p5,
+                "color": color("color_pm2p5", config)
+            },
+            "proposal": {
+                "value": proposal,
+                "color": color("color_proposal", config)
+            },
+            "chp": {
+                "value": chp,
+                "color": color("color_chp", config)
+            },
+            "yq": {
+                "value": yq,
+                "color": color("color_yq", config)
+            },
+        }
     }
-}
-
     for key, value in horoscope_data.items():
         # 将星座数据插入data
         data["data"][key] = {"value": value, "color": color("color_{}".format(key), config)}

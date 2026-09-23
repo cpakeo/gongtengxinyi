@@ -131,46 +131,72 @@ def get_weather(region, config):
     }
     key = config["weather_key"]
     region_url = "https://api.qweather.com/v2/city/lookup?location={}&key={}".format(region, key)
-    response = get(region_url, headers=headers, timeout=15).json()
-    if response["code"] == "404":
+    response = get(region_url, headers=headers, timeout=15)
+    print("城市查询返回文本：", response.text)
+    try:
+        res_json = response.json()
+    except Exception as e:
+        print("城市接口JSON解析失败！", e)
+        sys.exit(1)
+
+    if res_json["code"] == "404":
         print("推送消息失败，请检查地区名是否有误！")
         sys.exit(1)
-    elif response["code"] == "401":
+    elif res_json["code"] == "401":
         print("推送消息失败，请检查和风天气key是否正确！")
         sys.exit(1)
     else:
-        location_id = response["location"][0]["id"]
+        location_id = res_json["location"][0]["id"]
 
     weather_url = "https://api.qweather.com/v7/weather/now?location={}&key={}".format(location_id, key)
-    response = get(weather_url, headers=headers, timeout=15).json()
-    weather = response["now"]["text"]
-    temp = response["now"]["temp"] + u"\N{DEGREE SIGN}" + "C"
-    wind_dir = response["now"]["windDir"]
+    response = get(weather_url, headers=headers, timeout=15)
+    print("实时天气返回文本：", response.text)
+    res_json = response.json()
+    weather = res_json["now"]["text"]
+    temp = res_json["now"]["temp"] + u"\N{DEGREE SIGN}" + "C"
+    wind_dir = res_json["now"]["windDir"]
+    windScale = res_json["now"]["windScale"]
+    precip = res_json["now"]["precip"]
+    humidity = res_json["now"]["humidity"]
+    uvIndex = res_json["now"]["uvIndex"]
 
     url = "https://api.qweather.com/v7/weather/3d?location={}&key={}".format(location_id, key)
-    response = get(url, headers=headers, timeout=15).json()
-    max_temp = response["daily"][0]["tempMax"] + u"\N{DEGREE SIGN}" + "C"
-    min_temp = response["daily"][0]["tempMin"] + u"\N{DEGREE SIGN}" + "C"
-    sunrise = response["daily"][0]["sunrise"]
-    sunset = response["daily"][0]["sunset"]
+    response = get(url, headers=headers, timeout=15)
+    print("3天预报返回文本：", response.text)
+    res_json = response.json()
+    max_temp = res_json["daily"][0]["tempMax"] + u"\N{DEGREE SIGN}" + "C"
+    min_temp = res_json["daily"][0]["tempMin"] + u"\N{DEGREE SIGN}" + "C"
+    sunrise = res_json["daily"][0]["sunrise"]
+    sunset = res_json["daily"][0]["sunset"]
 
     url = "https://api.qweather.com/v7/air/now?location={}&key={}".format(location_id, key)
-    response = get(url, headers=headers, timeout=15).json()
-    if response["code"] == "200":
-        category = response["now"]["category"]
-        pm2p5 = response["now"]["pm2p5"]
-    else:
+    response = get(url, headers=headers, timeout=15)
+    print("空气质量返回文本：", response.text)
+    try:
+        res_json = response.json()
+        if res_json["code"] == "200":
+            category = res_json["now"]["category"]
+            pm2p5 = res_json["now"]["pm2p5"]
+        else:
+            category = ""
+            pm2p5 = ""
+    except Exception:
         category = ""
         pm2p5 = ""
 
     id = random.randint(1, 16)
     url = "https://api.qweather.com/v7/indices/1d?location={}&key={}&type={}".format(location_id, key, id)
-    response = get(url, headers=headers, timeout=15).json()
-    proposal = ""
-    if response["code"] == "200":
-        proposal += response["daily"][0]["text"]
+    response = get(url, headers=headers, timeout=15)
+    print("指数接口返回文本：", response.text)
+    try:
+        res_json = response.json()
+        proposal = ""
+        if res_json["code"] == "200":
+            proposal += res_json["daily"][0]["text"]
+    except Exception:
+        proposal = ""
 
-    return weather, temp, max_temp, min_temp, wind_dir, sunrise, sunset, category, pm2p5, proposal
+    return weather, temp, max_temp, min_temp, wind_dir, sunrise, sunset, category, pm2p5, proposal, precip, windScale, humidity, uvIndex
 
 
 def get_tianhang(config):
@@ -235,7 +261,7 @@ def get_ciba():
 
 
 def send_message(to_user, access_token, region_name, weather, temp, wind_dir, note_ch, note_en, max_temp, min_temp,
-                 sunrise, sunset, category, pm2p5, proposal, chp, config, yq, horoscope_data):
+                 sunrise, sunset, category, pm2p5, proposal, chp, config, yq, horoscope_data, precip, windScale, humidity, uvIndex):
     url = "https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={}".format(access_token)
     week_list = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"]
     os.environ['TZ'] = 'Asia/Shanghai'
@@ -275,8 +301,20 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, no
                 "color": color("color_temp", config)
             },
             "wind_dir": {
-                "value": wind_dir,
+                "value": f"{wind_dir} {windScale}级",
                 "color": color("color_wind", config)
+            },
+            "precip": {
+                "value": f"{precip}mm",
+                "color": color("color_precip", config)
+            },
+            "humidity": {
+                "value": f"{humidity}%",
+                "color": color("color_humidity", config)
+            },
+            "uvIndex": {
+                "value": uvIndex,
+                "color": color("color_uvIndex", config)
             },
             "note_en": {
                 "value": note_en,
@@ -376,7 +414,7 @@ def handler(event, context):
     accessToken = get_access_token(config)
     users = config["user"]
     region = config["region"]
-    weather, temp, max_temp, min_temp, wind_dir, sunrise, sunset, category, pm2p5, proposal = get_weather(region, config)
+    weather, temp, max_temp, min_temp, wind_dir, sunrise, sunset, category, pm2p5, proposal, precip, windScale, humidity, uvIndex = get_weather(region, config)
     note_ch = config["note_ch"]
     note_en = config["note_en"]
     if note_ch == "" and note_en == "":
@@ -388,7 +426,7 @@ def handler(event, context):
 
     for user in users:
         send_message(user, accessToken, region, weather, temp, wind_dir, note_ch, note_en, max_temp, min_temp, sunrise,
-                     sunset, category, pm2p5, proposal, chp, config, yq_data, horoscope_data)
+                     sunset, category, pm2p5, proposal, chp, config, yq_data, horoscope_data, precip, windScale, humidity, uvIndex)
     time.sleep(5)
 
 

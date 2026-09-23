@@ -1,7 +1,6 @@
 import random
 import time
 from time import localtime
-# from time import tzset
 from requests import get, post
 from datetime import datetime, date
 from zhdate import ZhDate
@@ -11,24 +10,23 @@ import os
 
 def get_horoscope(config_data):
     horoscope_data = {}
+    # 遍历config里面所有horoscope开头的配置，例如 horoscope1: "taurus"
     for k, v in config_data.items():
-        if k[0:9] == "horoscope":
+        if k.startswith("horoscope"):
             try:
                 key = config_data["tian_api"]
                 url = "https://apis.tianapi.com/star/index?key={}&astro={}".format(key, v)
                 headers = {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                                  'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
-                    'Content-type': 'application/x-www-form-urlencoded'
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
                 }
                 response = get(url, headers=headers, timeout=10).json()
                 if response["code"] == 200:
-                    horoscope = response["newslist"][-1]["content"]
-                    horoscope = horoscope.split("。")[0]
+                    horoscope = response["newslist"][0]["content"]
                 else:
-                    horoscope = ""
-            except Exception:
-                horoscope = ""
+                    horoscope = "暂无星座运势"
+            except Exception as e:
+                print(f"星座获取异常 {k}:", e)
+                horoscope = "暂无星座运势"
             horoscope_data[k] = horoscope
     return horoscope_data
 
@@ -41,8 +39,6 @@ def yq(region, config_data):
         city = ""
         if r["code"] == "200":
             city = r["location"][0]["adm2"]
-            if region in ["台北", "高雄", "台中", "台湾"]:
-                city = "台湾"
         headers = {
             'user-agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Mobile Safari/537.36',
         }
@@ -74,7 +70,7 @@ def get_commemoration_day(today, commemoration_day):
 def get_commemoration_data(today, config_data):
     commemoration_days = {}
     for k, v in config_data.items():
-        if k[0:13] == "commemoration":
+        if k.startswith("commemoration"):
             commemoration_days[k] = get_commemoration_day(today, v)
     return commemoration_days
 
@@ -82,7 +78,7 @@ def get_commemoration_data(today, config_data):
 def get_countdown_data(today, config_data):
     countdown_data = {}
     for k, v in config_data.items():
-        if k[0:9] == "countdown":
+        if k.startswith("countdown"):
             countdown_year = int(v.split("-")[0])
             countdown_month = int(v.split("-")[1])
             countdown_day = int(v.split("-")[2])
@@ -119,26 +115,22 @@ def get_access_token(config):
         access_token = get(post_url, timeout=10).json()['access_token']
     except KeyError:
         print("获取access_token失败，请检查app_id和app_secret是否正确")
-        os.system("pause")
         sys.exit(1)
     return access_token
 
 
 def get_weather(region, config):
     headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                      'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
     }
     key = config["weather_key"]
     region_url = "https://geoapi.qweather.com/v2/city/lookup?location={}&key={}".format(region, key)
     response = get(region_url, headers=headers, timeout=10).json()
     if response["code"] == "404":
         print("推送消息失败，请检查地区名是否有误！")
-        os.system("pause")
         sys.exit(1)
     elif response["code"] == "401":
         print("推送消息失败，请检查和风天气key是否正确！")
-        os.system("pause")
         sys.exit(1)
     else:
         location_id = response["location"][0]["id"]
@@ -148,8 +140,8 @@ def get_weather(region, config):
     weather = response["now"]["text"]
     temp = response["now"]["temp"] + u"\N{DEGREE SIGN}" + "C"
     wind_dir = response["now"]["windDir"]
-    rain = response["now"].get("precip", "0") + "mm"
-    wet = response["now"].get("humidity", "") + "%"
+    rain = response["now"].get("precip", "0")
+    wet = response["now"].get("humidity", "")
 
     url = "https://devapi.qweather.com/v7/weather/3d?location={}&key={}".format(location_id, key)
     response = get(url, headers=headers, timeout=10).json()
@@ -172,17 +164,15 @@ def get_weather(region, config):
         hourly_url = "https://devapi.qweather.com/v7/weather/24h?location={}&key={}".format(location_id, key)
         hourly_resp = get(hourly_url, headers=headers, timeout=10).json()
         if hourly_resp["code"] == "200":
-            rain_prob = hourly_resp["hourly"][0].get("pop", "") + "%"
+            rain_prob = hourly_resp["hourly"][0].get("pop", "")
     except Exception:
         rain_prob = ""
 
     url = "https://devapi.qweather.com/v7/air/now?location={}&key={}".format(location_id, key)
     response = get(url, headers=headers, timeout=10).json()
     if response["code"] == "200":
-        category = response["now"]["category"]
         pm2p5 = response["now"]["pm2p5"]
     else:
-        category = ""
         pm2p5 = ""
 
     id = random.randint(1, 16)
@@ -192,7 +182,7 @@ def get_weather(region, config):
     if response["code"] == "200":
         proposal += response["daily"][0]["text"]
 
-    return weather, temp, max_temp, min_temp, wind_dir, rain, rain_prob, wet, uv, sunrise, sunset, category, pm2p5, proposal
+    return weather, temp, max_temp, min_temp, wind_dir, rain, rain_prob, wet, uv, sunrise, sunset, pm2p5, proposal
 
 
 def get_tianhang(config):
@@ -200,9 +190,7 @@ def get_tianhang(config):
         key = config["tian_api"]
         url = "https://apis.tianapi.com/caihongpi/index?key={}".format(key)
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                          'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
-            'Content-type': 'application/x-www-form-urlencoded'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
         }
         response = get(url, headers=headers, timeout=10).json()
         if response["code"] == 200:
@@ -223,7 +211,6 @@ def get_birthday(birthday, year, today):
             year_date = ZhDate(year, r_mouth, r_day).to_datetime().date()
         except TypeError:
             print("请检查生日的日子是否在今年存在")
-            os.system("pause")
             sys.exit(1)
     else:
         birthday_month = int(birthday.split("-")[1])
@@ -251,8 +238,7 @@ def get_ciba():
         url = "http://open.iciba.com/dsapi/"
         headers = {
             'Content-Type': 'application/json',
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                          'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
         }
         r = get(url, headers=headers, timeout=10)
         res = r.json()
@@ -263,6 +249,7 @@ def get_ciba():
     return note_ch, note_en
 
 
+# 【修复天行每日英语接口地址】
 def get_tian_note(config):
     note_ch = ""
     note_en = ""
@@ -270,17 +257,19 @@ def get_tian_note(config):
         key = config.get("tian_api", "")
         if not key:
             return note_ch, note_en
+        # 修正接口地址：everyday/index
         url = "https://apis.tianapi.com/everyday/index?key={}".format(key)
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                          'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
         }
         response = get(url, headers=headers, timeout=10).json()
         if response.get("code") == 200 and response.get("result"):
             note_en = response["result"]["content"]
             note_ch = response["result"]["note"]
+            print("天行金句获取成功")
     except Exception as e:
         print("天行金句获取失败：", e)
+    # 兜底默认文字
     if not note_ch:
         note_ch = "保持热爱，奔赴山海"
     if not note_en:
@@ -290,7 +279,7 @@ def get_tian_note(config):
 
 def send_message(to_user, access_token, region_name, weather, temp, wind_dir, rain, rain_prob, wet, uv,
                  note_ch, note_en, max_temp, min_temp,
-                 sunrise, sunset, category, pm2p5, proposal, chp, config, yq, horoscope_data):
+                 sunrise, sunset, pm2p5, proposal, chp, config, yq, horoscope_data):
     url = "https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={}".format(access_token)
     week_list = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"]
     os.environ['TZ'] = 'Asia/Shanghai'
@@ -304,7 +293,7 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, ra
     countdown_data = get_countdown_data(today, config)
     birthdays = {}
     for k, v in config.items():
-        if k[0:5] == "birth":
+        if k.startswith("birth"):
             birthdays[k] = v
 
     data = {
@@ -373,10 +362,6 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, ra
                 "value": sunset,
                 "color": color("color_sunset", config)
             },
-            "category": {
-                "value": category,
-                "color": color("color_category", config)
-            },
             "pm2p5": {
                 "value": pm2p5,
                 "color": color("color_pm2p5", config)
@@ -395,46 +380,45 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, ra
             },
         }
     }
+    # 星座数据注入
     for key, value in horoscope_data.items():
-        data["data"][key] = {"value": value, "color": color("color_{}".format(key), config)}
+        data["data"][key] = {"value": value, "color": color(f"color_{key}", config)}
+    # 纪念日
     for key, value in commemoration_data.items():
-        data["data"][key] = {"value": value, "color": color("color_{}".format(key), config)}
+        data["data"][key] = {"value": value, "color": color(f"color_{key}", config)}
+    # 倒计时
     for key, value in countdown_data.items():
-        data["data"][key] = {"value": value, "color": color("color_{}".format(key), config)}
+        data["data"][key] = {"value": value, "color": color(f"color_{key}", config)}
+    # 生日
     for key, value in birthdays.items():
         birth_day = get_birthday(value["birthday"], year, today)
         if birth_day == 0:
             birthday_data = "今天{}生日哦，祝{}生日快乐！".format(value["name"], value["name"])
         else:
             birthday_data = "距离{}的生日还有{}天".format(value["name"], birth_day)
-        data["data"][key] = {"value": birthday_data, "color": color("color_{}".format(key), config)}
+        data["data"][key] = {"value": birthday_data, "color": color(f"color_{key}", config)}
 
     headers = {
         'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                      'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
     }
     response = post(url, headers=headers, json=data, timeout=10).json()
     if response["errcode"] == 40037:
         print("推送消息失败，请检查模板id是否正确")
-        os.system("pause")
         sys.exit(1)
     elif response["errcode"] == 40036:
         print("推送消息失败，请检查模板id是否为空")
-        os.system("pause")
         sys.exit(1)
     elif response["errcode"] == 40003:
         print("推送消息失败，请检查微信号是否正确")
-        os.system("pause")
         sys.exit(1)
     elif response["errcode"] == 43004:
         print("推送消息失败，用户取消关注公众号")
-        os.system("pause")
         sys.exit(1)
     elif response["errcode"] == 0:
         print("推送消息成功")
     else:
-        print(response)
+        print("推送返回：", response)
 
 
 def handler(event, context):
@@ -443,24 +427,23 @@ def handler(event, context):
             config = eval(f.read())
     except FileNotFoundError:
         print("推送消息失败，请检查config.txt文件是否与程序位于同一路径")
-        os.system("pause")
         sys.exit(1)
     except SyntaxError:
-        print("推送消息失败，请检查配置文件格式是否正确")
-        os.system("pause")
+        print("推送消息失败，请检查配置文件格式是否正确，不要带#注释！")
         sys.exit(1)
 
     accessToken = get_access_token(config)
     users = config["user"]
     region = config["region"]
-    weather, temp, max_temp, min_temp, wind_dir, rain, rain_prob, wet, uv, sunrise, sunset, category, pm2p5, proposal = get_weather(region, config)
+    weather, temp, max_temp, min_temp, wind_dir, rain, rain_prob, wet, uv, sunrise, sunset, pm2p5, proposal = get_weather(region, config)
 
     note_ch = config["note_ch"]
     note_en = config["note_en"]
+    # 优先天行金句，失败再用词霸
     if note_ch == "" and note_en == "":
-        note_ch, note_en = get_ciba()
+        note_ch, note_en = get_tian_note(config)
         if note_ch == "" or note_en == "":
-            note_ch, note_en = get_tian_note(config)
+            note_ch, note_en = get_ciba()
 
     chp = get_tianhang(config)
     yq_data = yq(region, config)
@@ -469,7 +452,7 @@ def handler(event, context):
     for user in users:
         send_message(user, accessToken, region, weather, temp, wind_dir, rain, rain_prob, wet, uv,
                      note_ch, note_en, max_temp, min_temp, sunrise,
-                     sunset, category, pm2p5, proposal, chp, config, yq_data, horoscope_data)
+                     sunset, pm2p5, proposal, chp, config, yq_data, horoscope_data)
     time.sleep(5)
 
 

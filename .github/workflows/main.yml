@@ -2,7 +2,6 @@ name: weixin
 on:
   workflow_dispatch:
   schedule:
-    # UTC 23点 = 北京时间次日早上7点，修改cron可以调整推送时间
     - cron: '0 23 * * *'
 jobs:
   build:

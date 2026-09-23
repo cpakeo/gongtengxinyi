@@ -36,6 +36,3 @@
 "color_countdown1": "#000000",
 "color_countdown2": "#000000"
 }
-
-
-

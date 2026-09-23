@@ -2,7 +2,7 @@ import requests
 import json
 from datetime import datetime, date
 
-# =========读取配置 config.json =========
+# 读取配置文件
 with open("config.json", "r", encoding="utf-8") as f:
     cfg = json.load(f)
 
@@ -19,36 +19,32 @@ astro_code = cfg["astro"]
 
 
 def get_access_token():
-    """获取微信access_token"""
     url = f"https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid={app_id}&secret={app_secret}"
     res = requests.get(url, timeout=10)
     data = res.json()
     if "access_token" in data:
-        print(f"微信 Access Token 接口返回: {data}")
+        print(f"微信 Access Token: {data}")
         return data["access_token"]
     else:
-        print("获取token失败", data)
+        print("获取access_token失败", data)
         return None
 
 
 def get_city_id(city):
-    """和风获取城市ID"""
     url = f"https://api.qweather.com/v2/city/lookup?location={city}&key={weather_key}"
     resp = requests.get(url, timeout=10)
-    print(f"和风城市查询 HTTP状态码：{resp.status_code}")
     if resp.status_code != 200:
-        print("和风城市查询请求失败")
+        print("和风城市查询失败")
         return None
     res = resp.json()
     if res["code"] == "200":
         return res["location"][0]["id"]
     else:
-        print("获取城市id失败", res)
+        print("获取城市ID失败", res)
         return None
 
 
 def get_weather_info(city_id):
-    """获取全部天气信息"""
     now_api = f"https://api.qweather.com/v7/weather/now?location={city_id}&key={weather_key}"
     now_res = requests.get(now_api, timeout=10).json()
 
@@ -92,7 +88,6 @@ def get_weather_info(city_id):
 
 
 def calc_countdown():
-    """生日倒计时、新年元旦倒计时"""
     today = date.today()
     birth = datetime.strptime(b_date, "%Y-%m-%d").date()
     next_birth = birth.replace(year=today.year)
@@ -106,7 +101,6 @@ def calc_countdown():
 
 
 def get_ciba_sentence():
-    """兜底：词霸每日一句，天行挂掉就用这个"""
     try:
         r = requests.get("http://open.iciba.com/dsapi/", timeout=10)
         j = r.json()
@@ -118,33 +112,31 @@ def get_ciba_sentence():
 
 
 def get_tianxing():
-    """天行：星座运势 + 【everyday/index 中英双语金句】"""
     horo_text = "暂无星座运势"
     zh_sentence = ""
     en_sentence = ""
 
-    # ---- 星座运势 ----
+    # 星座
     try:
         url_horo = f"https://apis.tianapi.com/star/index?key={tx_key}&astro={astro_code}"
         horo_resp = requests.get(url_horo, timeout=10).json()
         if horo_resp["code"] == 200:
             horo_text = horo_resp["result"]["list"][0]["content"]
     except Exception as e:
-        print("星座获取异常：", e)
+        print("星座接口异常：", e)
 
-    # ---- 每日中英金句 【正确接口 everyday/index】 ----
+    # 每日中英金句
     try:
         url_sentence = f"https://apis.tianapi.com/everyday/index?key={tx_key}"
         sen_resp = requests.get(url_sentence, timeout=10).json()
-        print("天行金句原始返回：", sen_resp)
+        print("天行金句返回：", sen_resp)
         if sen_resp["code"] == 200:
             result = sen_resp["result"]
             en_sentence = result["content"]
             zh_sentence = result["note"]
     except Exception as e:
-        print("天行金句接口异常：", e)
+        print("金句接口异常：", e)
 
-    # 如果天行拿不到金句，调用词霸兜底
     if not zh_sentence or not en_sentence:
         print("天行金句为空，启用词霸兜底")
         zh_sentence, en_sentence = get_ciba_sentence()
@@ -182,7 +174,7 @@ def send_msg(token, openid, weather, birth_left, new_year_left, horoscope, zh_se
         }
     }
     res = requests.post(url, json=post_data, timeout=10)
-    print("推送返回结果：", res.json())
+    print("推送返回：", res.json())
 
 
 if __name__ == "__main__":

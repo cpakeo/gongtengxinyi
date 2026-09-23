@@ -10,7 +10,6 @@ import os
 
 def get_horoscope(config_data):
     horoscope_data = {}
-    # 遍历config里面所有horoscope开头的配置，例如 horoscope1: "taurus"
     for k, v in config_data.items():
         if k.startswith("horoscope"):
             try:
@@ -24,6 +23,7 @@ def get_horoscope(config_data):
                     horoscope = response["newslist"][0]["content"]
                 else:
                     horoscope = "暂无星座运势"
+                    print(f"星座接口返回错误: {response}")
             except Exception as e:
                 print(f"星座获取异常 {k}:", e)
                 horoscope = "暂无星座运势"
@@ -249,27 +249,38 @@ def get_ciba():
     return note_ch, note_en
 
 
-# 【修复天行每日英语接口地址】
+# 天行每日英语（everyday/index）修复版，增加日志打印
 def get_tian_note(config):
     note_ch = ""
     note_en = ""
     try:
         key = config.get("tian_api", "")
         if not key:
+            print("【警告】tian_api为空，跳过天行金句")
             return note_ch, note_en
-        # 修正接口地址：everyday/index
+
         url = "https://apis.tianapi.com/everyday/index?key={}".format(key)
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
         }
-        response = get(url, headers=headers, timeout=10).json()
-        if response.get("code") == 200 and response.get("result"):
-            note_en = response["result"]["content"]
-            note_ch = response["result"]["note"]
-            print("天行金句获取成功")
+        response = get(url, headers=headers, timeout=10)
+        print("天行金句接口原始返回：", response.text)
+        result = response.json()
+
+        if result.get("code") == 200:
+            if result.get("result"):
+                note_en = result["result"].get("content", "")
+                note_ch = result["result"].get("note", "")
+            elif result.get("newslist") and len(result["newslist"]) > 0:
+                note_en = result["newslist"][0].get("content", "")
+                note_ch = result["newslist"][0].get("note", "")
+            print(f"✅天行金句解析成功：中文：{note_ch}，英文：{note_en}")
+        else:
+            print(f"❌天行金句接口返回code异常：{result}")
     except Exception as e:
-        print("天行金句获取失败：", e)
-    # 兜底默认文字
+        print(f"❌天行金句获取异常：{e}")
+
+    # 兜底默认文案
     if not note_ch:
         note_ch = "保持热爱，奔赴山海"
     if not note_en:
@@ -416,7 +427,7 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, ra
         print("推送消息失败，用户取消关注公众号")
         sys.exit(1)
     elif response["errcode"] == 0:
-        print("推送消息成功")
+        print("✅推送消息成功")
     else:
         print("推送返回：", response)
 
@@ -437,13 +448,18 @@ def handler(event, context):
     region = config["region"]
     weather, temp, max_temp, min_temp, wind_dir, rain, rain_prob, wet, uv, sunrise, sunset, pm2p5, proposal = get_weather(region, config)
 
-    note_ch = config["note_ch"]
-    note_en = config["note_en"]
-    # 优先天行金句，失败再用词霸
-    if note_ch == "" and note_en == "":
-        note_ch, note_en = get_tian_note(config)
-        if note_ch == "" or note_en == "":
-            note_ch, note_en = get_ciba()
+    # 【核心修改：直接读取天行金句，不再读取config里note_ch/note_en覆盖】
+    note_ch, note_en = get_tian_note(config)
+    # 天行失败，词霸兜底
+    if not note_ch or not note_en:
+        print("天行金句为空，尝试词霸兜底")
+        note_ch, note_en = get_ciba()
+    # 兜底默认文案
+    if not note_ch:
+        note_ch = "保持热爱，奔赴山海"
+    if not note_en:
+        note_en = "Keep loving, keep going."
+    print(f"📤最终准备发送金句：中文={note_ch}，英文={note_en}")
 
     chp = get_tianhang(config)
     yq_data = yq(region, config)

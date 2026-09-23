@@ -21,7 +21,6 @@ def get_horoscope(config_data):
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                                   'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
                     'Content-type': 'application/x-www-form-urlencoded'
-
                 }
                 response = get(url, headers=headers).json()
                 if response["code"] == 200:
@@ -48,7 +47,6 @@ def yq(region, config_data):
     headers = {
         'user-agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Mobile Safari/537.36',
     }
-
     response = get('https://covid.myquark.cn/quark/covid/data?city={}'.format(city), headers=headers).json()
     if city in ["北京", "上海", "天津", "重庆", "香港", "澳门", "台湾"]:
         city_data = response["provinceData"]
@@ -135,7 +133,6 @@ def get_access_token(config):
         print("获取access_token失败，请检查app_id和app_secret是否正确")
         os.system("pause")
         sys.exit(1)
-    # print(access_token)
     return access_token
 
 
@@ -158,6 +155,8 @@ def get_weather(region, config):
     else:
         # 获取地区的location--id
         location_id = response["location"][0]["id"]
+
+    # ===== 实时天气 now =====
     weather_url = "https://devapi.qweather.com/v7/weather/now?location={}&key={}".format(location_id, key)
     response = get(weather_url, headers=headers).json()
     # 天气
@@ -166,7 +165,12 @@ def get_weather(region, config):
     temp = response["now"]["temp"] + u"\N{DEGREE SIGN}" + "C"
     # 风向
     wind_dir = response["now"]["windDir"]
-    # 获取逐日天气预报
+    # 【新增】降雨量（过去1小时降水量，单位mm）
+    rain = response["now"].get("precip", "0") + "mm"
+    # 【新增】相对湿度（百分比）
+    wet = response["now"].get("humidity", "") + "%"
+
+    # ===== 逐日预报 3d =====
     url = "https://devapi.qweather.com/v7/weather/3d?location={}&key={}".format(location_id, key)
     response = get(url, headers=headers).json()
     # 最高气温
@@ -177,6 +181,20 @@ def get_weather(region, config):
     sunrise = response["daily"][0]["sunrise"]
     # 日落时间
     sunset = response["daily"][0]["sunset"]
+    # 【新增】紫外线强度指数
+    uv = response["daily"][0].get("uvIndexMax", "")
+
+    # ===== 逐小时预报 24h（获取降雨概率） =====
+    rain_prob = ""
+    try:
+        hourly_url = "https://devapi.qweather.com/v7/weather/24h?location={}&key={}".format(location_id, key)
+        hourly_resp = get(hourly_url, headers=headers).json()
+        if hourly_resp["code"] == "200":
+            rain_prob = hourly_resp["hourly"][0].get("pop", "") + "%"
+    except Exception:
+        rain_prob = ""
+
+    # ===== 空气质量 =====
     url = "https://devapi.qweather.com/v7/air/now?location={}&key={}".format(location_id, key)
     response = get(url, headers=headers).json()
     if response["code"] == "200":
@@ -188,13 +206,17 @@ def get_weather(region, config):
         # 国外城市获取不到数据
         category = ""
         pm2p5 = ""
+
+    # ===== 生活指数 =====
     id = random.randint(1, 16)
     url = "https://devapi.qweather.com/v7/indices/1d?location={}&key={}&type={}".format(location_id, key, id)
     response = get(url, headers=headers).json()
     proposal = ""
     if response["code"] == "200":
         proposal += response["daily"][0]["text"]
-    return weather, temp, max_temp, min_temp, wind_dir, sunrise, sunset, category, pm2p5, proposal
+
+    # 返回值新增 rain, rain_prob, wet, uv
+    return weather, temp, max_temp, min_temp, wind_dir, rain, rain_prob, wet, uv, sunrise, sunset, category, pm2p5, proposal
 
 
 def get_tianhang(config):
@@ -205,7 +227,6 @@ def get_tianhang(config):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                           'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
             'Content-type': 'application/x-www-form-urlencoded'
-
         }
         response = get(url, headers=headers).json()
         if response["code"] == 200:
@@ -230,7 +251,6 @@ def get_birthday(birthday, year, today):
             print("请检查生日的日子是否在今年存在")
             os.system("pause")
             sys.exit(1)
-
     else:
         # 获取国历生日的今年对应月和日
         birthday_month = int(birthday.split("-")[1])
@@ -255,19 +275,48 @@ def get_birthday(birthday, year, today):
 
 
 def get_ciba():
-    url = "http://open.iciba.com/dsapi/"
-    headers = {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                      'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
-    }
-    r = get(url, headers=headers)
-    note_en = r.json()["content"]
-    note_ch = r.json()["note"]
+    """词霸每日一句，失败则返回空"""
+    note_ch = ""
+    note_en = ""
+    try:
+        url = "http://open.iciba.com/dsapi/"
+        headers = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                          'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
+        }
+        r = get(url, headers=headers, timeout=10)
+        note_en = r.json()["content"]
+        note_ch = r.json()["note"]
+    except Exception as e:
+        print("词霸接口获取失败：", e)
     return note_ch, note_en
 
 
-def send_message(to_user, access_token, region_name, weather, temp, wind_dir, note_ch, note_en, max_temp, min_temp,
+def get_tian_note(config):
+    """天行每日一句（中英对照），作为金句备选"""
+    note_ch = ""
+    note_en = ""
+    try:
+        key = config.get("tian_api", "")
+        if not key:
+            return note_ch, note_en
+        url = "http://api.tianapi.com/everyday/index?key={}".format(key)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                          'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
+        }
+        response = get(url, headers=headers, timeout=10).json()
+        if response.get("code") == 200 and response.get("newslist"):
+            note_ch = response["newslist"][0].get("content", "")
+            note_en = response["newslist"][0].get("english", "")
+    except Exception as e:
+        print("天行金句接口获取失败：", e)
+    return note_ch, note_en
+
+
+def send_message(to_user, access_token, region_name, weather, temp, wind_dir, rain, rain_prob, wet, uv,
+                 note_ch, note_en, max_temp, min_temp,
                  sunrise, sunset, category, pm2p5, proposal, chp, config, yq, horoscope_data):
     url = "https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={}".format(access_token)
     week_list = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"]
@@ -278,7 +327,7 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, no
     day = localtime().tm_mday
     today = datetime.date(datetime(year=year, month=month, day=day))
     week = week_list[today.isoweekday() % 7]
-    # date1 = datetime.now()
+
     # 获取所有纪念日数据
     commemoration_data = get_commemoration_data(today, config)
     # 获取所有倒计时数据
@@ -288,6 +337,7 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, no
     for k, v in config.items():
         if k[0:5] == "birth":
             birthdays[k] = v
+
     data = {
         "touser": to_user,
         "template_id": config["template_id"],
@@ -310,9 +360,30 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, no
                 "value": temp,
                 "color": color("color_temp", config)
             },
-            "wind_dir": {
+            # 【改】key 从 wind_dir 改为 wind，模板用 {{wind.DATA}}
+            "wind": {
                 "value": wind_dir,
                 "color": color("color_wind", config)
+            },
+            # 【新增】降雨量
+            "rain": {
+                "value": rain,
+                "color": color("color_weather", config)
+            },
+            # 【新增】降雨概率
+            "rain_prob": {
+                "value": rain_prob,
+                "color": color("color_weather", config)
+            },
+            # 【新增】相对湿度
+            "wet": {
+                "value": wet,
+                "color": color("color_weather", config)
+            },
+            # 【新增】紫外线强度指数
+            "uv": {
+                "value": uv,
+                "color": color("color_weather", config)
             },
             "note_en": {
                 "value": note_en,
@@ -320,7 +391,7 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, no
             },
             "note_ch": {
                 "value": note_ch,
-                "color": color("color_note_zh", config)
+                "color": color("color_note_ch", config)
             },
             "max_temp": {
                 "value": max_temp,
@@ -352,13 +423,12 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, no
             },
             "chp": {
                 "value": chp,
-                "color":  color("color_chp", config)
+                "color": color("color_chp", config)
             },
             "yq": {
                 "value": yq,
                 "color": color("color_yq", config)
             },
-
         }
     }
     for key, value in horoscope_data.items():
@@ -379,6 +449,7 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, no
             birthday_data = "距离{}的生日还有{}天".format(value["name"], birth_day)
         # 将生日数据插入data
         data["data"][key] = {"value": birthday_data, "color": color("color_{}".format(key), config)}
+
     headers = {
         'Content-Type': 'application/json',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
@@ -424,14 +495,23 @@ def handler(event, context):
     accessToken = get_access_token(config)
     # 接收的用户
     users = config["user"]
-    # 传入地区获取天气信息
+    # 传入地区获取天气信息（返回值新增 rain, rain_prob, wet, uv）
     region = config["region"]
-    weather, temp, max_temp, min_temp, wind_dir, sunrise, sunset, category, pm2p5, proposal = get_weather(region, config)
+    weather, temp, max_temp, min_temp, wind_dir, rain, rain_prob, wet, uv, sunrise, sunset, category, pm2p5, proposal = get_weather(region, config)
+
     note_ch = config["note_ch"]
     note_en = config["note_en"]
     if note_ch == "" and note_en == "":
-        # 获取词霸每日金句
+        # 先试词霸
         note_ch, note_en = get_ciba()
+        # 词霸失败则用天行每日一句兜底
+        if note_ch == "" or note_en == "":
+            tian_ch, tian_en = get_tian_note(config)
+            if note_ch == "":
+                note_ch = tian_ch
+            if note_en == "":
+                note_en = tian_en
+
     chp = get_tianhang(config)
     # 获取疫情数据
     yq_data = yq(region, config)
@@ -439,7 +519,8 @@ def handler(event, context):
     horoscope_data = get_horoscope(config)
     # 公众号推送消息
     for user in users:
-        send_message(user, accessToken, region, weather, temp, wind_dir, note_ch, note_en, max_temp, min_temp, sunrise,
+        send_message(user, accessToken, region, weather, temp, wind_dir, rain, rain_prob, wet, uv,
+                     note_ch, note_en, max_temp, min_temp, sunrise,
                      sunset, category, pm2p5, proposal, chp, config, yq_data, horoscope_data)
     time.sleep(5)
 

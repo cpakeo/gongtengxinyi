@@ -1,6 +1,7 @@
 import random
 import time
 from time import localtime
+# from time import tzset
 from requests import get, post
 from datetime import datetime, date
 from zhdate import ZhDate
@@ -9,79 +10,85 @@ import os
 
 
 def get_horoscope(config_data):
+    # 获取所有星座数据
     horoscope_data = {}
     for k, v in config_data.items():
-        if k.startswith("horoscope"):
+        if k[0:9] == "horoscope":
             try:
                 key = config_data["tian_api"]
-                url = "https://apis.tianapi.com/star/index?key={}&astro={}".format(key, v)
+                url = "http://api.tianapi.com/star/index?key={}&astro={}".format(key, v)
                 headers = {
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                                   'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
                     'Content-type': 'application/x-www-form-urlencoded'
                 }
-                response = get(url, headers=headers, timeout=15).json()
+                response = get(url, headers=headers).json()
                 if response["code"] == 200:
-                    horoscope = response["result"]["list"][0]["content"]
+                    horoscope = response["newslist"][-1]["content"]
                     horoscope = horoscope.split("。")[0]
                 else:
                     horoscope = ""
-            except Exception:
+            except KeyError:
                 horoscope = ""
             horoscope_data[k] = horoscope
     return horoscope_data
 
 
 def yq(region, config_data):
-    try:
-        key = config_data["weather_key"]
-        url = "https://api.qweather.com/v2/city/lookup?key={}&location={}".format(key, region)
-        r = get(url, timeout=15).json()
+    key = config_data["weather_key"]
+    url = "https://geoapi.qweather.com/v2/city/lookup?key={}&location={}".format(key, region)
+    r = get(url).json()
+    if r["code"] == "200":
+        city = r["location"][0]["adm2"]
+        if region in ["台北", "高雄", "台中", "台湾"]:
+            city = "台湾"
+    else:
         city = ""
-        if r["code"] == "200":
-            city = r["location"][0]["adm2"]
-            if region in ["台北", "高雄", "台中", "台湾"]:
-                city = "台湾"
-        headers = {
-            'user-agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Mobile Safari/537.36',
-        }
-        response = get('https://covid.myquark.cn/quark/covid/data?city={}'.format(city), headers=headers, timeout=15).json()
-        if city in ["北京", "上海", "天津", "重庆", "香港", "澳门", "台湾"]:
-            city_data = response["provinceData"]
-        else:
-            city_data = response["cityData"]
+    headers = {
+        'user-agent': 'Mozilla/5.0 (Linux; Android 6.0; Nexus 5 Build/MRA58N) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/104.0.0.0 Mobile Safari/537.36',
+    }
+    response = get('https://covid.myquark.cn/quark/covid/data?city={}'.format(city), headers=headers).json()
+    if city in ["北京", "上海", "天津", "重庆", "香港", "澳门", "台湾"]:
+        city_data = response["provinceData"]
+    else:
+        city_data = response["cityData"]
+    try:
         sure_new_loc = "昨日新增：{}".format(city_data["sure_new_loc"])
         sure_new_hid = "昨日无症状：{}".format(city_data["sure_new_hid"])
         present = "现有确诊：{}".format(city_data["present"])
         danger = "中/高风险区：{}/{}".format(city_data["danger"]["1"], city_data["danger"]["2"])
         statistics_time = response["time"]
         yq_data = "{}疫情数据\n{}\n{}\n{}\n{}\n{}".format(city, sure_new_loc, sure_new_hid, present, danger, statistics_time)
-    except Exception:
+    except TypeError:
         yq_data = ""
     return yq_data
 
 
 def get_commemoration_day(today, commemoration_day):
+    # 获取纪念日的日期格式
     commemoration_year = int(commemoration_day.split("-")[0])
     commemoration_month = int(commemoration_day.split("-")[1])
     commemoration_day = int(commemoration_day.split("-")[2])
     commemoration_date = date(commemoration_year, commemoration_month, commemoration_day)
+    # 获取纪念日的日期差
     commemoration_days = str(today.__sub__(commemoration_date)).split(" ")[0]
     return commemoration_days
 
 
 def get_commemoration_data(today, config_data):
+    # 获取所有纪念日数据
     commemoration_days = {}
     for k, v in config_data.items():
-        if k.startswith("commemoration"):
+        if k[0:13] == "commemoration":
             commemoration_days[k] = get_commemoration_day(today, v)
     return commemoration_days
 
 
 def get_countdown_data(today, config_data):
+    # 获取所有倒计时数据
     countdown_data = {}
     for k, v in config_data.items():
-        if k.startswith("countdown"):
+        if k[0:9] == "countdown":
             countdown_year = int(v.split("-")[0])
             countdown_month = int(v.split("-")[1])
             countdown_day = int(v.split("-")[2])
@@ -94,6 +101,7 @@ def get_countdown_data(today, config_data):
 
 
 def color(name, config):
+    # 获取字体颜色，如没设置返回随机颜色
     try:
         if config[name] == "":
             color = get_color()
@@ -106,20 +114,24 @@ def color(name, config):
 
 
 def get_color():
+    # 获取随机颜色
     get_colors = lambda n: list(map(lambda i: "#" + "%06x" % random.randint(0, 0xFFFFFF), range(n)))
     color_list = get_colors(100)
     return random.choice(color_list)
 
 
 def get_access_token(config):
+    # appId
     app_id = config["app_id"]
+    # appSecret
     app_secret = config["app_secret"]
     post_url = ("https://api.weixin.qq.com/cgi-bin/token?grant_type=client_credential&appid={}&secret={}"
                 .format(app_id, app_secret))
     try:
-        access_token = get(post_url, timeout=15).json()['access_token']
+        access_token = get(post_url).json()['access_token']
     except KeyError:
         print("获取access_token失败，请检查app_id和app_secret是否正确")
+        os.system("pause")
         sys.exit(1)
     return access_token
 
@@ -130,134 +142,125 @@ def get_weather(region, config):
                       'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
     }
     key = config["weather_key"]
-    region_url = "https://api.qweather.com/v2/city/lookup?location={}&key={}".format(region, key)
-    response = get(region_url, headers=headers, timeout=15)
-    print("====城市查询status_code：", response.status_code)
-    print("====城市查询返回原始文本：|", response.text, "|")
-    try:
-        res_json = response.json()
-    except Exception as e:
-        print("城市接口JSON解析失败！", e)
-        return "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
-
-    if res_json["code"] == "404":
-        print("地区名称错误！")
-        return "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
-    elif res_json["code"] == "401":
-        print("和风key错误或者权限不足！")
-        return "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
-    elif res_json["code"] != "200":
-        print("和风接口异常，code=", res_json["code"])
-        return "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+    region_url = "https://geoapi.qweather.com/v2/city/lookup?location={}&key={}".format(region, key)
+    response = get(region_url, headers=headers).json()
+    if response["code"] == "404":
+        print("推送消息失败，请检查地区名是否有误！")
+        os.system("pause")
+        sys.exit(1)
+    elif response["code"] == "401":
+        print("推送消息失败，请检查和风天气key是否正确！")
+        os.system("pause")
+        sys.exit(1)
     else:
-        location_id = res_json["location"][0]["id"]
+        # 获取地区的location--id
+        location_id = response["location"][0]["id"]
 
-    weather_url = "https://api.qweather.com/v7/weather/now?location={}&key={}".format(location_id, key)
-    response = get(weather_url, headers=headers, timeout=15)
-    print("====实时天气返回文本：", response.text)
+    # ===== 实时天气 now =====
+    weather_url = "https://devapi.qweather.com/v7/weather/now?location={}&key={}".format(location_id, key)
+    response = get(weather_url, headers=headers).json()
+    # 天气
+    weather = response["now"]["text"]
+    # 当前温度
+    temp = response["now"]["temp"] + u"\N{DEGREE SIGN}" + "C"
+    # 风向
+    wind_dir = response["now"]["windDir"]
+    # 【新增】降雨量（过去1小时降水量，单位mm）
+    rain = response["now"].get("precip", "0") + "mm"
+    # 【新增】相对湿度（百分比）
+    wet = response["now"].get("humidity", "") + "%"
+
+    # ===== 逐日预报 3d =====
+    url = "https://devapi.qweather.com/v7/weather/3d?location={}&key={}".format(location_id, key)
+    response = get(url, headers=headers).json()
+    # 最高气温
+    max_temp = response["daily"][0]["tempMax"] + u"\N{DEGREE SIGN}" + "C"
+    # 最低气温
+    min_temp = response["daily"][0]["tempMin"] + u"\N{DEGREE SIGN}" + "C"
+    # 日出时间
+    sunrise = response["daily"][0]["sunrise"]
+    # 日落时间
+    sunset = response["daily"][0]["sunset"]
+    # 【新增】紫外线强度指数
+    uv = response["daily"][0].get("uvIndexMax", "")
+
+    # ===== 逐小时预报 24h（获取降雨概率） =====
+    rain_prob = ""
     try:
-        res_json = response.json()
-    except Exception as e:
-        print("实时天气接口解析失败", e)
-        return "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
-
-    weather = res_json["now"]["text"]
-    temp = res_json["now"]["temp"] + u"\N{DEGREE SIGN}" + "C"
-    wind_dir = res_json["now"]["windDir"]
-    windScale = res_json["now"]["windScale"]
-    precip = res_json["now"]["precip"]
-    humidity = res_json["now"]["humidity"]
-    uvIndex = res_json["now"]["uvIndex"]
-
-    url_3d = "https://api.qweather.com/v7/weather/3d?location={}&key={}".format(location_id, key)
-    response = get(url_3d, headers=headers, timeout=15)
-    print("====3天预报返回文本：", response.text)
-    pop = ""
-    try:
-        res_3d = response.json()
-        if res_3d["code"] == "200":
-            max_temp = res_3d["daily"][0]["tempMax"] + u"\N{DEGREE SIGN}" + "C"
-            min_temp = res_3d["daily"][0]["tempMin"] + u"\N{DEGREE SIGN}" + "C"
-            sunrise = res_3d["daily"][0]["sunrise"]
-            sunset = res_3d["daily"][0]["sunset"]
-            pop = res_3d["daily"][0]["pop"]
-        else:
-            max_temp = ""
-            min_temp = ""
-            sunrise = ""
-            sunset = ""
-    except Exception as e:
-        print("3天预报解析失败", e)
-        max_temp = ""
-        min_temp = ""
-        sunrise = ""
-        sunset = ""
-
-    url_air = "https://api.qweather.com/v7/air/now?location={}&key={}".format(location_id, key)
-    response = get(url_air, headers=headers, timeout=15)
-    print("====空气质量返回文本：", response.text)
-    try:
-        res_air = response.json()
-        if res_air["code"] == "200":
-            category = res_air["now"]["category"]
-            pm2p5 = res_air["now"]["pm2p5"]
-        else:
-            category = ""
-            pm2p5 = ""
+        hourly_url = "https://devapi.qweather.com/v7/weather/24h?location={}&key={}".format(location_id, key)
+        hourly_resp = get(hourly_url, headers=headers).json()
+        if hourly_resp["code"] == "200":
+            rain_prob = hourly_resp["hourly"][0].get("pop", "") + "%"
     except Exception:
+        rain_prob = ""
+
+    # ===== 空气质量 =====
+    url = "https://devapi.qweather.com/v7/air/now?location={}&key={}".format(location_id, key)
+    response = get(url, headers=headers).json()
+    if response["code"] == "200":
+        # 空气质量
+        category = response["now"]["category"]
+        # pm2.5
+        pm2p5 = response["now"]["pm2p5"]
+    else:
+        # 国外城市获取不到数据
         category = ""
         pm2p5 = ""
 
+    # ===== 生活指数 =====
     id = random.randint(1, 16)
-    url_index = "https://api.qweather.com/v7/indices/1d?location={}&key={}&type={}".format(location_id, key, id)
-    response = get(url_index, headers=headers, timeout=15)
-    print("====指数接口返回文本：", response.text)
-    try:
-        res_index = response.json()
-        proposal = ""
-        if res_index["code"] == "200":
-            proposal += res_index["daily"][0]["text"]
-    except Exception:
-        proposal = ""
+    url = "https://devapi.qweather.com/v7/indices/1d?location={}&key={}&type={}".format(location_id, key, id)
+    response = get(url, headers=headers).json()
+    proposal = ""
+    if response["code"] == "200":
+        proposal += response["daily"][0]["text"]
 
-    return weather, temp, max_temp, min_temp, wind_dir, sunrise, sunset, category, pm2p5, proposal, precip, windScale, humidity, uvIndex, pop
+    # 返回值新增 rain, rain_prob, wet, uv
+    return weather, temp, max_temp, min_temp, wind_dir, rain, rain_prob, wet, uv, sunrise, sunset, category, pm2p5, proposal
 
 
 def get_tianhang(config):
     try:
         key = config["tian_api"]
-        url = "https://apis.tianapi.com/caihongpi/index?key={}".format(key)
+        url = "http://api.tianapi.com/caihongpi/index?key={}".format(key)
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                           'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
             'Content-type': 'application/x-www-form-urlencoded'
         }
-        response = get(url, headers=headers, timeout=15).json()
+        response = get(url, headers=headers).json()
         if response["code"] == 200:
-            chp = response["result"]["list"][0]["content"]
+            chp = response["newslist"][0]["content"]
         else:
             chp = ""
-    except Exception:
+    except KeyError:
         chp = ""
     return chp
 
 
 def get_birthday(birthday, year, today):
     birthday_year = birthday.split("-")[0]
+    # 判断是否为农历生日
     if birthday_year[0] == "r":
         r_mouth = int(birthday.split("-")[1])
         r_day = int(birthday.split("-")[2])
+        # 获取农历生日的生日
         try:
             year_date = ZhDate(year, r_mouth, r_day).to_datetime().date()
         except TypeError:
             print("请检查生日的日子是否在今年存在")
+            os.system("pause")
             sys.exit(1)
     else:
+        # 获取国历生日的今年对应月和日
         birthday_month = int(birthday.split("-")[1])
         birthday_day = int(birthday.split("-")[2])
+        # 今年生日
         year_date = date(year, birthday_month, birthday_day)
+    # 计算生日年份，如果还没过，按当年减，如果过了需要+1
     if today > year_date:
         if birthday_year[0] == "r":
+            # 获取农历明年生日的月和日
             r_last_birthday = ZhDate((year + 1), r_mouth, r_day).to_datetime().date()
             birth_date = date((year + 1), r_last_birthday.month, r_last_birthday.day)
         else:
@@ -272,34 +275,67 @@ def get_birthday(birthday, year, today):
 
 
 def get_ciba():
-    url = "http://open.iciba.com/dsapi/"
-    headers = {
-        'Content-Type': 'application/json',
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
-                      'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
-    }
-    r = get(url, headers=headers, timeout=15)
-    note_en = r.json()["content"]
-    note_ch = r.json()["note"]
+    """词霸每日一句，失败则返回空"""
+    note_ch = ""
+    note_en = ""
+    try:
+        url = "http://open.iciba.com/dsapi/"
+        headers = {
+            'Content-Type': 'application/json',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                          'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
+        }
+        r = get(url, headers=headers, timeout=10)
+        note_en = r.json()["content"]
+        note_ch = r.json()["note"]
+    except Exception as e:
+        print("词霸接口获取失败：", e)
     return note_ch, note_en
 
 
-def send_message(to_user, access_token, region_name, weather, temp, wind_dir, note_ch, note_en, max_temp, min_temp,
-                 sunrise, sunset, category, pm2p5, proposal, chp, config, yq, horoscope_data, precip, windScale, humidity, uvIndex, pop):
+def get_tian_note(config):
+    """天行每日一句（中英对照），作为金句备选"""
+    note_ch = ""
+    note_en = ""
+    try:
+        key = config.get("tian_api", "")
+        if not key:
+            return note_ch, note_en
+        url = "http://api.tianapi.com/everyday/index?key={}".format(key)
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
+                          'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
+        }
+        response = get(url, headers=headers, timeout=10).json()
+        if response.get("code") == 200 and response.get("newslist"):
+            note_ch = response["newslist"][0].get("content", "")
+            note_en = response["newslist"][0].get("english", "")
+    except Exception as e:
+        print("天行金句接口获取失败：", e)
+    return note_ch, note_en
+
+
+def send_message(to_user, access_token, region_name, weather, temp, wind_dir, rain, rain_prob, wet, uv,
+                 note_ch, note_en, max_temp, min_temp,
+                 sunrise, sunset, category, pm2p5, proposal, chp, config, yq, horoscope_data):
     url = "https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={}".format(access_token)
     week_list = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"]
     os.environ['TZ'] = 'Asia/Shanghai'
+    # tzset()
     year = localtime().tm_year
     month = localtime().tm_mon
     day = localtime().tm_mday
     today = datetime.date(datetime(year=year, month=month, day=day))
     week = week_list[today.isoweekday() % 7]
 
+    # 获取所有纪念日数据
     commemoration_data = get_commemoration_data(today, config)
+    # 获取所有倒计时数据
     countdown_data = get_countdown_data(today, config)
+    # 获取所有生日数据
     birthdays = {}
     for k, v in config.items():
-        if k.startswith("birth"):
+        if k[0:5] == "birth":
             birthdays[k] = v
 
     data = {
@@ -313,95 +349,105 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, no
                 "color": color("color_date", config)
             },
             "region": {
-                "value": region_name if region_name else "无",
+                "value": region_name,
                 "color": color("color_region", config)
             },
             "weather": {
-                "value": weather if weather else "无",
+                "value": weather,
                 "color": color("color_weather", config)
             },
             "temp": {
-                "value": temp if temp else "无",
+                "value": temp,
                 "color": color("color_temp", config)
             },
-            "wind_dir": {
-                "value": f"{wind_dir} {windScale}级" if wind_dir else "无",
+            # 【改】key 从 wind_dir 改为 wind，模板用 {{wind.DATA}}
+            "wind": {
+                "value": wind_dir,
                 "color": color("color_wind", config)
             },
-            "precip": {
-                "value": f"{precip}mm" if precip else "无",
-                "color": color("color_precip", config)
+            # 【新增】降雨量
+            "rain": {
+                "value": rain,
+                "color": color("color_weather", config)
             },
-            "pop": {
-                "value": f"{pop}%" if pop else "无",
-                "color": color("color_pop", config)
+            # 【新增】降雨概率
+            "rain_prob": {
+                "value": rain_prob,
+                "color": color("color_weather", config)
             },
-            "humidity": {
-                "value": f"{humidity}%" if humidity else "无",
-                "color": color("color_humidity", config)
+            # 【新增】相对湿度
+            "wet": {
+                "value": wet,
+                "color": color("color_weather", config)
             },
-            "uvIndex": {
-                "value": uvIndex if uvIndex else "无",
-                "color": color("color_uvIndex", config)
+            # 【新增】紫外线强度指数
+            "uv": {
+                "value": uv,
+                "color": color("color_weather", config)
             },
             "note_en": {
-                "value": note_en if note_en else "无",
+                "value": note_en,
                 "color": color("color_note_en", config)
             },
             "note_ch": {
-                "value": note_ch if note_ch else "无",
+                "value": note_ch,
                 "color": color("color_note_ch", config)
             },
             "max_temp": {
-                "value": max_temp if max_temp else "无",
+                "value": max_temp,
                 "color": color("color_max_temp", config)
             },
             "min_temp": {
-                "value": min_temp if min_temp else "无",
+                "value": min_temp,
                 "color": color("color_min_temp", config)
             },
             "sunrise": {
-                "value": sunrise if sunrise else "无",
+                "value": sunrise,
                 "color": color("color_sunrise", config)
             },
             "sunset": {
-                "value": sunset if sunset else "无",
+                "value": sunset,
                 "color": color("color_sunset", config)
             },
             "category": {
-                "value": category if category else "无",
+                "value": category,
                 "color": color("color_category", config)
             },
             "pm2p5": {
-                "value": pm2p5 if pm2p5 else "无",
+                "value": pm2p5,
                 "color": color("color_pm2p5", config)
             },
             "proposal": {
-                "value": proposal if proposal else "无",
+                "value": proposal,
                 "color": color("color_proposal", config)
             },
             "chp": {
-                "value": chp if chp else "无",
+                "value": chp,
                 "color": color("color_chp", config)
             },
             "yq": {
-                "value": yq if yq else "无",
+                "value": yq,
                 "color": color("color_yq", config)
             },
         }
     }
     for key, value in horoscope_data.items():
-        data["data"][key] = {"value": value if value else "无", "color": color("color_{}".format(key), config)}
+        # 将星座数据插入data
+        data["data"][key] = {"value": value, "color": color("color_{}".format(key), config)}
     for key, value in commemoration_data.items():
-        data["data"][key] = {"value": value if value else "无", "color": color("color_{}".format(key), config)}
+        # 将纪念日数据插入data
+        data["data"][key] = {"value": value, "color": color("color_{}".format(key), config)}
     for key, value in countdown_data.items():
-        data["data"][key] = {"value": value if value else "无", "color": color("color_{}".format(key), config)}
+        # 将倒计时数据插入data
+        data["data"][key] = {"value": value, "color": color("color_{}".format(key), config)}
     for key, value in birthdays.items():
+        # 获取距离下次生日的时间
         birth_day = get_birthday(value["birthday"], year, today)
         if birth_day == 0:
             birthday_data = "今天{}生日哦，祝{}生日快乐！".format(value["name"], value["name"])
         else:
             birthday_data = "距离{}的生日还有{}天".format(value["name"], birth_day)
+        # 将生日数据插入data
         data["data"][key] = {"value": birthday_data, "color": color("color_{}".format(key), config)}
 
     headers = {
@@ -409,18 +455,22 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, no
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                       'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36'
     }
-    response = post(url, headers=headers, json=data, timeout=15).json()
+    response = post(url, headers=headers, json=data).json()
     if response["errcode"] == 40037:
         print("推送消息失败，请检查模板id是否正确")
+        os.system("pause")
         sys.exit(1)
     elif response["errcode"] == 40036:
         print("推送消息失败，请检查模板id是否为空")
+        os.system("pause")
         sys.exit(1)
     elif response["errcode"] == 40003:
         print("推送消息失败，请检查微信号是否正确")
+        os.system("pause")
         sys.exit(1)
     elif response["errcode"] == 43004:
         print("推送消息失败，用户取消关注公众号")
+        os.system("pause")
         sys.exit(1)
     elif response["errcode"] == 0:
         print("推送消息成功")
@@ -434,27 +484,44 @@ def handler(event, context):
             config = eval(f.read())
     except FileNotFoundError:
         print("推送消息失败，请检查config.txt文件是否与程序位于同一路径")
+        os.system("pause")
         sys.exit(1)
     except SyntaxError:
-        print("推送消息失败，请检查配置文件格式是否正确，eval不支持#注释！")
+        print("推送消息失败，请检查配置文件格式是否正确")
+        os.system("pause")
         sys.exit(1)
 
+    # 获取accessToken
     accessToken = get_access_token(config)
+    # 接收的用户
     users = config["user"]
+    # 传入地区获取天气信息（返回值新增 rain, rain_prob, wet, uv）
     region = config["region"]
-    weather, temp, max_temp, min_temp, wind_dir, sunrise, sunset, category, pm2p5, proposal, precip, windScale, humidity, uvIndex, pop = get_weather(region, config)
+    weather, temp, max_temp, min_temp, wind_dir, rain, rain_prob, wet, uv, sunrise, sunset, category, pm2p5, proposal = get_weather(region, config)
+
     note_ch = config["note_ch"]
     note_en = config["note_en"]
     if note_ch == "" and note_en == "":
+        # 先试词霸
         note_ch, note_en = get_ciba()
+        # 词霸失败则用天行每日一句兜底
+        if note_ch == "" or note_en == "":
+            tian_ch, tian_en = get_tian_note(config)
+            if note_ch == "":
+                note_ch = tian_ch
+            if note_en == "":
+                note_en = tian_en
 
     chp = get_tianhang(config)
+    # 获取疫情数据
     yq_data = yq(region, config)
+    # 获取星座数据
     horoscope_data = get_horoscope(config)
-
+    # 公众号推送消息
     for user in users:
-        send_message(user, accessToken, region, weather, temp, wind_dir, note_ch, note_en, max_temp, min_temp, sunrise,
-                     sunset, category, pm2p5, proposal, chp, config, yq_data, horoscope_data, precip, windScale, humidity, uvIndex, pop)
+        send_message(user, accessToken, region, weather, temp, wind_dir, rain, rain_prob, wet, uv,
+                     note_ch, note_en, max_temp, min_temp, sunrise,
+                     sunset, category, pm2p5, proposal, chp, config, yq_data, horoscope_data)
     time.sleep(5)
 
 

@@ -163,7 +163,7 @@ def get_weather(region, config):
     # 当前温度
     temp = response["now"]["temp"] + u"\N{DEGREE SIGN}" + "C"
     # 风向
-    wind_dir = response["now"]["windDir"]
+    wind = response["now"]["windDir"]
     # 【新增】风力等级
     windScale = response["now"]["windScale"]
     # 【新增】降雨量（过去1小时降水量，单位mm）

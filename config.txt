@@ -6,7 +6,7 @@
 "weather_key": "9d7ad6f0e80b45849864d1392c1ebe03",
 "tian_api": "6c81ddd76d8c6c984084e872482edaa4",
 "region": "管城回族区",
-"birthday2": {"name":"新一","birthday":"2003-07-22"},
+"birthday2": {"name": "新一", "birthday": "2003-07-22"},
 "countdown1": "2027-01-01",
 "note_ch": "",
 "note_en": "",

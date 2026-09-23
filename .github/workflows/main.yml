@@ -1,30 +1,28 @@
 name: weixin
-
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 23 * * *'
-
+    - cron: '0 22 * * *'
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v2
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - name: Set up Python 3.9
+        uses: actions/setup-python@v2
         with:
-          python-version: "3.9"
+          python-version: 3.9.1
 
       - name: Set timezone
         run: |
-          sudo timedatectl set-timezone Asia/Shanghai
+          cp /usr/share/zoneinfo/Asia/Shanghai /etc/localtime
 
-      - name: Install dependencies
+      - name: install pip packages
         run: |
           python -m pip install --upgrade pip
-          pip install requests zhdate
+          pip3 install -r requirements.txt
 
-      - name: Run main.py
-        run: python main.py
+      - name: weixin
+        run: |
+          python3 main.py

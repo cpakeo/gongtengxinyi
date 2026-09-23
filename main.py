@@ -155,7 +155,6 @@ def get_weather(region, config):
     else:
         # 获取地区的location--id
         location_id = response["location"][0]["id"]
-
     # ===== 实时天气 now =====
     weather_url = "https://devapi.qweather.com/v7/weather/now?location={}&key={}".format(location_id, key)
     response = get(weather_url, headers=headers).json()
@@ -165,15 +164,16 @@ def get_weather(region, config):
     temp = response["now"]["temp"] + u"\N{DEGREE SIGN}" + "C"
     # 风向
     wind_dir = response["now"]["windDir"]
+    # 【新增】风力等级
+    windScale = response["now"]["windScale"]
     # 【新增】降雨量（过去1小时降水量，单位mm）
     rain = response["now"].get("precip", "0") + "mm"
     # 【新增】相对湿度（百分比）
     wet = response["now"].get("humidity", "") + "%"
-
     # ===== 逐日预报 3d =====
     url = "https://devapi.qweather.com/v7/weather/3d?location={}&key={}".format(location_id, key)
     response = get(url, headers=headers).json()
-    print("3d天气接口返回code：",response["code"])
+    print("3d天气接口返回code：", response["code"])
     # 最高气温
     max_temp = response["daily"][0]["tempMax"] + u"\N{DEGREE SIGN}" + "C"
     # 最低气温
@@ -182,7 +182,6 @@ def get_weather(region, config):
     sunrise = response["daily"][0]["sunrise"]
     # 日落时间
     sunset = response["daily"][0]["sunset"]
-
     # ===== 逐小时预报 24h（获取降雨概率） =====
     rain_prob = ""
     try:
@@ -192,7 +191,6 @@ def get_weather(region, config):
             rain_prob = hourly_resp["hourly"][0].get("pop", "") + "%"
     except Exception:
         rain_prob = ""
-
     # ===== 空气质量 =====
     url = "https://devapi.qweather.com/v7/air/now?location={}&key={}".format(location_id, key)
     response = get(url, headers=headers).json()
@@ -205,7 +203,6 @@ def get_weather(region, config):
         # 国外城市获取不到数据
         category = ""
         pm2p5 = ""
-
     # ===== 生活指数 【这里获取紫外线 type=5 紫外线指数】=====
     uv = "无"
     try:
@@ -215,8 +212,7 @@ def get_weather(region, config):
             uv = index_resp["daily"][0].get("level","无")
     except Exception:
         uv = "无"
-    print("紫外线指数：",uv)
-
+    print("紫外线指数：", uv)
     # ===== 随机生活提示（原来的proposal） =====
     id = random.randint(1, 16)
     url = "https://devapi.qweather.com/v7/indices/1d?location={}&key={}&type={}".format(location_id, key, id)
@@ -225,9 +221,8 @@ def get_weather(region, config):
     if response["code"] == "200":
         proposal += response["daily"][0]["text"]
 
-    # 返回值新增 rain, rain_prob, wet, uv
-    return weather, temp, max_temp, min_temp, wind_dir, rain, rain_prob, wet, uv, sunrise, sunset, category, pm2p5, proposal
-
+    # 返回增加 windScale（风力）
+    return weather, temp, max_temp, min_temp, wind_dir, windScale, rain, rain_prob, wet, uv, sunrise, sunset, category, pm2p5, proposal
 
 
 def get_tianhang(config):
@@ -329,12 +324,10 @@ def get_tian_note(config):
             note_ch = res.get("note", "")
     except Exception as e:
         print("天行金句POST调用异常：", e)
-
     # 第一步兜底：调用词霸
     if not note_ch or not note_en:
         print("天行金句无数据，启用词霸兜底")
         note_ch, note_en = get_ciba()
-
     # ✅终极兜底：词霸也超时/失败，使用内置备用金句列表，保证绝不空白
     backup_list = [
         ("保持热爱，奔赴山海", "Keep loving, keep going."),
@@ -347,15 +340,11 @@ def get_tian_note(config):
         import random
         print("⚠️词霸也失效，启用本地内置金句！")
         note_ch, note_en = random.choice(backup_list)
-
     return note_ch, note_en
 
 
-
-
-def send_message(to_user, access_token, region_name, weather, temp, wind_dir, rain, rain_prob, wet, uv,
-                 note_ch, note_en, max_temp, min_temp,
-                 sunrise, sunset, category, pm2p5, proposal, chp, config, yq, horoscope_data):
+def send_message(to_user, access_token, region_name, weather, temp, max_temp, min_temp, wind_dir, windScale, rain, rain_prob, wet, uv,
+                 note_ch, note_en, sunrise, sunset, category, pm2p5, proposal, chp, config, yq, horoscope_data):
     url = "https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={}".format(access_token)
     week_list = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"]
     os.environ['TZ'] = 'Asia/Shanghai'
@@ -365,7 +354,6 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, ra
     day = localtime().tm_mday
     today = datetime.date(datetime(year=year, month=month, day=day))
     week = week_list[today.isoweekday() % 7]
-
     # 获取所有纪念日数据
     commemoration_data = get_commemoration_data(today, config)
     # 获取所有倒计时数据
@@ -375,7 +363,6 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, ra
     for k, v in config.items():
         if k[0:5] == "birth":
             birthdays[k] = v
-
     data = {
         "touser": to_user,
         "template_id": config["template_id"],
@@ -398,27 +385,26 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, ra
                 "value": temp,
                 "color": color("color_temp", config)
             },
-            # 【改】key 从 wind_dir 改为 wind，模板用 {{wind.DATA}}
-            "wind": {
+            "wind_dir": {
                 "value": wind_dir,
-                "color": color("color_wind", config)
+                "color": color("color_wind_dir", config)
             },
-            # 【新增】降雨量
+            "wind_scale": {
+                "value": f"{windScale}级" if windScale else "",
+                "color": color("color_wind_scale", config)
+            },
             "rain": {
                 "value": rain,
                 "color": color("color_weather", config)
             },
-            # 【新增】降雨概率
             "rain_prob": {
                 "value": rain_prob,
                 "color": color("color_weather", config)
             },
-            # 【新增】相对湿度
             "wet": {
                 "value": wet,
                 "color": color("color_weather", config)
             },
-            # 【新增】紫外线强度指数
             "uv": {
                 "value": uv,
                 "color": color("color_weather", config)
@@ -487,7 +473,6 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, ra
             birthday_data = "距离{}的生日还有{}天".format(value["name"], birth_day)
         # 将生日数据插入data
         data["data"][key] = {"value": birthday_data, "color": color("color_{}".format(key), config)}
-
     headers = {
         'Content-Type': 'application/json',
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
@@ -528,15 +513,13 @@ def handler(event, context):
         print("推送消息失败，请检查配置文件格式是否正确")
         os.system("pause")
         sys.exit(1)
-
     # 获取accessToken
     accessToken = get_access_token(config)
     # 接收的用户
     users = config["user"]
-    # 传入地区获取天气信息（返回值新增 rain, rain_prob, wet, uv）
+    # 传入地区获取天气信息（返回增加 windScale）
     region = config["region"]
-    weather, temp, max_temp, min_temp, wind_dir, rain, rain_prob, wet, uv, sunrise, sunset, category, pm2p5, proposal = get_weather(region, config)
-
+    weather, temp, max_temp, min_temp, wind_dir, windScale, rain, rain_prob, wet, uv, sunrise, sunset, category, pm2p5, proposal = get_weather(region, config)
     note_ch = config["note_ch"]
     note_en = config["note_en"]
     if note_ch == "" and note_en == "":
@@ -549,7 +532,6 @@ def handler(event, context):
                 note_ch = tian_ch
             if note_en == "":
                 note_en = tian_en
-
     chp = get_tianhang(config)
     # 获取疫情数据
     yq_data = yq(region, config)
@@ -557,8 +539,8 @@ def handler(event, context):
     horoscope_data = get_horoscope(config)
     # 公众号推送消息
     for user in users:
-        send_message(user, accessToken, region, weather, temp, wind_dir, rain, rain_prob, wet, uv,
-                     note_ch, note_en, max_temp, min_temp, sunrise,
+        send_message(user, accessToken, region, weather, temp, max_temp, min_temp, wind_dir, windScale, rain, rain_prob, wet, uv,
+                     note_ch, note_en, sunrise,
                      sunset, category, pm2p5, proposal, chp, config, yq_data, horoscope_data)
     time.sleep(5)
 

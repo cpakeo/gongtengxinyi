@@ -138,18 +138,17 @@ def get_weather(region, config):
         res_json = response.json()
     except Exception as e:
         print("城市接口JSON解析失败！", e)
-        # 接口异常，返回空值，不直接退出程序
-        return "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+        return "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
 
     if res_json["code"] == "404":
         print("地区名称错误！")
-        return "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+        return "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
     elif res_json["code"] == "401":
         print("和风key错误或者权限不足！")
-        return "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+        return "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
     elif res_json["code"] != "200":
         print("和风接口异常，code=", res_json["code"])
-        return "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+        return "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
     else:
         location_id = res_json["location"][0]["id"]
 
@@ -160,7 +159,7 @@ def get_weather(region, config):
         res_json = response.json()
     except Exception as e:
         print("实时天气接口解析失败", e)
-        return "", "", "", "", "", "", "", "", "", "", "", "", "", ""
+        return "", "", "", "", "", "", "", "", "", "", "", "", "", "", ""
 
     weather = res_json["now"]["text"]
     temp = res_json["now"]["temp"] + u"\N{DEGREE SIGN}" + "C"
@@ -170,31 +169,38 @@ def get_weather(region, config):
     humidity = res_json["now"]["humidity"]
     uvIndex = res_json["now"]["uvIndex"]
 
-    url = "https://api.qweather.com/v7/weather/3d?location={}&key={}".format(location_id, key)
-    response = get(url, headers=headers, timeout=15)
+    url_3d = "https://api.qweather.com/v7/weather/3d?location={}&key={}".format(location_id, key)
+    response = get(url_3d, headers=headers, timeout=15)
     print("====3天预报返回文本：", response.text)
+    pop = ""
     try:
-        res_json = response.json()
+        res_3d = response.json()
+        if res_3d["code"] == "200":
+            max_temp = res_3d["daily"][0]["tempMax"] + u"\N{DEGREE SIGN}" + "C"
+            min_temp = res_3d["daily"][0]["tempMin"] + u"\N{DEGREE SIGN}" + "C"
+            sunrise = res_3d["daily"][0]["sunrise"]
+            sunset = res_3d["daily"][0]["sunset"]
+            pop = res_3d["daily"][0]["pop"]
+        else:
+            max_temp = ""
+            min_temp = ""
+            sunrise = ""
+            sunset = ""
     except Exception as e:
         print("3天预报解析失败", e)
         max_temp = ""
         min_temp = ""
         sunrise = ""
         sunset = ""
-    else:
-        max_temp = res_json["daily"][0]["tempMax"] + u"\N{DEGREE SIGN}" + "C"
-        min_temp = res_json["daily"][0]["tempMin"] + u"\N{DEGREE SIGN}" + "C"
-        sunrise = res_json["daily"][0]["sunrise"]
-        sunset = res_json["daily"][0]["sunset"]
 
-    url = "https://api.qweather.com/v7/air/now?location={}&key={}".format(location_id, key)
-    response = get(url, headers=headers, timeout=15)
+    url_air = "https://api.qweather.com/v7/air/now?location={}&key={}".format(location_id, key)
+    response = get(url_air, headers=headers, timeout=15)
     print("====空气质量返回文本：", response.text)
     try:
-        res_json = response.json()
-        if res_json["code"] == "200":
-            category = res_json["now"]["category"]
-            pm2p5 = res_json["now"]["pm2p5"]
+        res_air = response.json()
+        if res_air["code"] == "200":
+            category = res_air["now"]["category"]
+            pm2p5 = res_air["now"]["pm2p5"]
         else:
             category = ""
             pm2p5 = ""
@@ -203,19 +209,18 @@ def get_weather(region, config):
         pm2p5 = ""
 
     id = random.randint(1, 16)
-    url = "https://api.qweather.com/v7/indices/1d?location={}&key={}&type={}".format(location_id, key, id)
-    response = get(url, headers=headers, timeout=15)
+    url_index = "https://api.qweather.com/v7/indices/1d?location={}&key={}&type={}".format(location_id, key, id)
+    response = get(url_index, headers=headers, timeout=15)
     print("====指数接口返回文本：", response.text)
     try:
-        res_json = response.json()
+        res_index = response.json()
         proposal = ""
-        if res_json["code"] == "200":
-            proposal += res_json["daily"][0]["text"]
+        if res_index["code"] == "200":
+            proposal += res_index["daily"][0]["text"]
     except Exception:
         proposal = ""
 
-    return weather, temp, max_temp, min_temp, wind_dir, sunrise, sunset, category, pm2p5, proposal, precip, windScale, humidity, uvIndex
-
+    return weather, temp, max_temp, min_temp, wind_dir, sunrise, sunset, category, pm2p5, proposal, precip, windScale, humidity, uvIndex, pop
 
 
 def get_tianhang(config):
@@ -280,7 +285,7 @@ def get_ciba():
 
 
 def send_message(to_user, access_token, region_name, weather, temp, wind_dir, note_ch, note_en, max_temp, min_temp,
-                 sunrise, sunset, category, pm2p5, proposal, chp, config, yq, horoscope_data, precip, windScale, humidity, uvIndex):
+                 sunrise, sunset, category, pm2p5, proposal, chp, config, yq, horoscope_data, precip, windScale, humidity, uvIndex, pop):
     url = "https://api.weixin.qq.com/cgi-bin/message/template/send?access_token={}".format(access_token)
     week_list = ["星期日", "星期一", "星期二", "星期三", "星期四", "星期五", "星期六"]
     os.environ['TZ'] = 'Asia/Shanghai'
@@ -308,85 +313,89 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, no
                 "color": color("color_date", config)
             },
             "region": {
-                "value": region_name,
+                "value": region_name if region_name else "无",
                 "color": color("color_region", config)
             },
             "weather": {
-                "value": weather,
+                "value": weather if weather else "无",
                 "color": color("color_weather", config)
             },
             "temp": {
-                "value": temp,
+                "value": temp if temp else "无",
                 "color": color("color_temp", config)
             },
             "wind_dir": {
-                "value": f"{wind_dir} {windScale}级",
+                "value": f"{wind_dir} {windScale}级" if wind_dir else "无",
                 "color": color("color_wind", config)
             },
             "precip": {
-                "value": f"{precip}mm",
+                "value": f"{precip}mm" if precip else "无",
                 "color": color("color_precip", config)
             },
+            "pop": {
+                "value": f"{pop}%" if pop else "无",
+                "color": color("color_pop", config)
+            },
             "humidity": {
-                "value": f"{humidity}%",
+                "value": f"{humidity}%" if humidity else "无",
                 "color": color("color_humidity", config)
             },
             "uvIndex": {
-                "value": uvIndex,
+                "value": uvIndex if uvIndex else "无",
                 "color": color("color_uvIndex", config)
             },
             "note_en": {
-                "value": note_en,
+                "value": note_en if note_en else "无",
                 "color": color("color_note_en", config)
             },
             "note_ch": {
-                "value": note_ch,
+                "value": note_ch if note_ch else "无",
                 "color": color("color_note_ch", config)
             },
             "max_temp": {
-                "value": max_temp,
+                "value": max_temp if max_temp else "无",
                 "color": color("color_max_temp", config)
             },
             "min_temp": {
-                "value": min_temp,
+                "value": min_temp if min_temp else "无",
                 "color": color("color_min_temp", config)
             },
             "sunrise": {
-                "value": sunrise,
+                "value": sunrise if sunrise else "无",
                 "color": color("color_sunrise", config)
             },
             "sunset": {
-                "value": sunset,
+                "value": sunset if sunset else "无",
                 "color": color("color_sunset", config)
             },
             "category": {
-                "value": category,
+                "value": category if category else "无",
                 "color": color("color_category", config)
             },
             "pm2p5": {
-                "value": pm2p5,
+                "value": pm2p5 if pm2p5 else "无",
                 "color": color("color_pm2p5", config)
             },
             "proposal": {
-                "value": proposal,
+                "value": proposal if proposal else "无",
                 "color": color("color_proposal", config)
             },
             "chp": {
-                "value": chp,
+                "value": chp if chp else "无",
                 "color": color("color_chp", config)
             },
             "yq": {
-                "value": yq,
+                "value": yq if yq else "无",
                 "color": color("color_yq", config)
             },
         }
     }
     for key, value in horoscope_data.items():
-        data["data"][key] = {"value": value, "color": color("color_{}".format(key), config)}
+        data["data"][key] = {"value": value if value else "无", "color": color("color_{}".format(key), config)}
     for key, value in commemoration_data.items():
-        data["data"][key] = {"value": value, "color": color("color_{}".format(key), config)}
+        data["data"][key] = {"value": value if value else "无", "color": color("color_{}".format(key), config)}
     for key, value in countdown_data.items():
-        data["data"][key] = {"value": value, "color": color("color_{}".format(key), config)}
+        data["data"][key] = {"value": value if value else "无", "color": color("color_{}".format(key), config)}
     for key, value in birthdays.items():
         birth_day = get_birthday(value["birthday"], year, today)
         if birth_day == 0:
@@ -433,7 +442,7 @@ def handler(event, context):
     accessToken = get_access_token(config)
     users = config["user"]
     region = config["region"]
-    weather, temp, max_temp, min_temp, wind_dir, sunrise, sunset, category, pm2p5, proposal, precip, windScale, humidity, uvIndex = get_weather(region, config)
+    weather, temp, max_temp, min_temp, wind_dir, sunrise, sunset, category, pm2p5, proposal, precip, windScale, humidity, uvIndex, pop = get_weather(region, config)
     note_ch = config["note_ch"]
     note_en = config["note_en"]
     if note_ch == "" and note_en == "":
@@ -445,7 +454,7 @@ def handler(event, context):
 
     for user in users:
         send_message(user, accessToken, region, weather, temp, wind_dir, note_ch, note_en, max_temp, min_temp, sunrise,
-                     sunset, category, pm2p5, proposal, chp, config, yq_data, horoscope_data, precip, windScale, humidity, uvIndex)
+                     sunset, category, pm2p5, proposal, chp, config, yq_data, horoscope_data, precip, windScale, humidity, uvIndex, pop)
     time.sleep(5)
 
 

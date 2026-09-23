@@ -292,70 +292,22 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, no
         "url": "http://weixin.qq.com/download",
         "topcolor": "#FF0000",
         "data": {
-            "date": {
-                "value": "{} {}".format(today, week),
-                "color": color("color_date", config)
-            },
-            "region": {
-                "value": region_name,
-                "color": color("color_region", config)
-            },
-            "weather": {
-                "value": weather,
-                "color": color("color_weather", config)
-            },
-            "temp": {
-                "value": temp,
-                "color": color("color_temp", config)
-            },
-            "wind_dir": {
-                "value": wind_dir,
-                "color": color("color_wind", config)
-            },
-            "note_en": {
-                "value": note_en,
-                "color": color("color_note_en", config)
-            },
-            "note_ch": {
-                "value": note_ch,
-                "color": color("color_note_ch", config)
-            },
-            "max_temp": {
-                "value": max_temp,
-                "color": color("color_max_temp", config)
-            },
-            "min_temp": {
-                "value": min_temp,
-                "color": color("color_min_temp", config)
-            },
-            "sunrise": {
-                "value": sunrise,
-                "color": color("color_sunrise", config)
-            },
-            "sunset": {
-                "value": sunset,
-                "color": color("color_sunset", config)
-            },
-            "category": {
-                "value": category,
-                "color": color("color_category", config)
-            },
-            "pm2p5": {
-                "value": pm2p5,
-                "color": color("color_pm2p5", config)
-            },
-            "proposal": {
-                "value": proposal,
-                "color": color("color_proposal", config)
-            },
-            "chp": {
-                "value": chp,
-                "color": color("color_chp", config)
-            },
-            "yq": {
-                "value": yq,
-                "color": color("color_yq", config)
-            },
+            "date": {"value": "{} {}".format(today, week), "color": color("color_date", config)},
+            "region": {"value": region_name, "color": color("color_region", config)},
+            "weather": {"value": weather, "color": color("color_weather", config)},
+            "temp": {"value": temp, "color": color("color_temp", config)},
+            "wind_dir": {"value": wind_dir, "color": color("color_wind", config)},
+            "note_en": {"value": note_en, "color": color("color_note_en", config)},
+            "note_ch": {"value": note_ch, "color": color("color_note_ch", config)},
+            "max_temp": {"value": max_temp, "color": color("color_max_temp", config)},
+            "min_temp": {"value": min_temp, "color": color("color_min_temp", config)},
+            "sunrise": {"value": sunrise, "color": color("color_sunrise", config)},
+            "sunset": {"value": sunset, "color": color("color_sunset", config)},
+            "category": {"value": category, "color": color("color_category", config)},
+            "pm2p5": {"value": pm2p5, "color": color("color_pm2p5", config)},
+            "proposal": {"value": proposal, "color": color("color_proposal", config)},
+            "chp": {"value": chp, "color": color("color_chp", config)},
+            "yq": {"value": yq, "color": color("color_yq", config)},
         }
     }
     for key, value in horoscope_data.items():

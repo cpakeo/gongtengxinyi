@@ -125,6 +125,17 @@ def handler(event, context):
     city = config["city"]
     astro = config["astro"]
 
+    # 颜色配置
+    color_date = config["color_date"]
+    color_region = config["color_region"]
+    color_weather = config["color_weather"]
+    color_temp = config["color_temp"]
+    color_wind = config["color_wind"]
+    color_note_en = config["color_note_en"]
+    color_note_ch = config["color_note_ch"]
+    color_max_temp = config["color_max_temp"]
+    color_min_temp = config["color_min_temp"]
+
     now = datetime.now()
     date_str = now.strftime("%Y-%m-%d %A")
 
@@ -134,21 +145,21 @@ def handler(event, context):
 
     data = {
         "first": {"value": "早上好呀！"},
-        "date": {"value": date_str},
-        "city": {"value": city},
-        "weather": {"value": weather},
-        "temp": {"value": temp},
-        "maxTemperature": {"value": max_temp},
-        "minTemperature": {"value": min_temp},
-        "wind": {"value": wind_dir},
+        "date": {"value": date_str, "color": color_date},
+        "city": {"value": city, "color": color_region},
+        "weather": {"value": weather, "color": color_weather},
+        "temp": {"value": temp, "color": color_temp},
+        "maxTemperature": {"value": max_temp, "color": color_max_temp},
+        "minTemperature": {"value": min_temp, "color": color_min_temp},
+        "wind": {"value": wind_dir, "color": color_wind},
         "rain": {"value": rain},
         "rain_prob": {"value": rain_prob},
         "wet": {"value": wet},
         "uv": {"value": uv},
         "pm2p5": {"value": pm2p5},
         "horoscope1": {"value": horoscope1},
-        "note_zh": {"value": note_zh},
-        "note_en": {"value": note_en},
+        "note_zh": {"value": note_zh, "color": color_note_ch},
+        "note_en": {"value": note_en, "color": color_note_en},
     }
     access_token = get_access_token(app_id, app_secret)
     send_msg(access_token,template_id,user_list,data)
@@ -161,3 +172,4 @@ if __name__ == "__main__":
         import traceback
         print("====程序崩溃错误详情====")
         print(traceback.format_exc())
+

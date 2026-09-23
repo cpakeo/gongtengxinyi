@@ -9,18 +9,139 @@ import os
 
 
 # ============================================================
+# 和风天气统一请求函数
+# ============================================================
+
+def qweather_get(path, config, params=None, timeout=15):
+
+    api_host = config.get("qweather_api_host", "").strip()
+    api_key = config.get("weather_key", "").strip()
+
+    if not api_host:
+        print("❌ 没有配置 qweather_api_host")
+        print("请在 config.txt 中增加：")
+        print('"qweather_api_host": "你的API Host"')
+        sys.exit(1)
+
+    if not api_host.startswith("http://") and not api_host.startswith("https://"):
+        api_host = "https://" + api_host
+
+    api_host = api_host.rstrip("/")
+
+    url = api_host + path
+
+    headers = {
+        "User-Agent": (
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+            "AppleWebKit/537.36 (KHTML, like Gecko) "
+            "Chrome/150.0.0.0 Safari/537.36"
+        ),
+        "Accept": "application/json"
+    }
+
+    # API KEY 使用请求参数方式
+    if params is None:
+        params = {}
+
+    params["key"] = api_key
+
+    try:
+
+        response = get(
+            url,
+            headers=headers,
+            params=params,
+            timeout=timeout
+        )
+
+        print("和风天气请求：", path)
+        print("HTTP 状态码：", response.status_code)
+        print("Content-Type：", response.headers.get("Content-Type"))
+        print(
+            "接口返回：",
+            repr(response.text[:2000])
+        )
+
+        if response.status_code != 200:
+
+            print(
+                "❌ 和风天气 HTTP 请求失败"
+            )
+
+            print(
+                "状态码：",
+                response.status_code
+            )
+
+            print(
+                "URL：",
+                url
+            )
+
+            sys.exit(1)
+
+        if not response.text.strip():
+
+            print(
+                "❌ 和风天气接口返回为空"
+            )
+
+            sys.exit(1)
+
+        try:
+
+            result = response.json()
+
+        except Exception as e:
+
+            print(
+                "❌ 和风天气返回内容不是 JSON"
+            )
+
+            print(
+                "JSON解析错误：",
+                e
+            )
+
+            print(
+                "原始返回：",
+                repr(response.text[:5000])
+            )
+
+            sys.exit(1)
+
+        return result
+
+    except Exception as e:
+
+        print(
+            "❌ 和风天气请求异常：",
+            e
+        )
+
+        sys.exit(1)
+
+
+# ============================================================
 # 星座运势
 # ============================================================
 
 def get_horoscope(config_data):
+
     horoscope_data = {}
 
     for k, v in config_data.items():
+
         if k.startswith("horoscope"):
+
             try:
+
                 key = config_data["tian_api"]
 
-                url = "https://apis.tianapi.com/star/index?key={}&astro={}".format(
+                url = (
+                    "https://apis.tianapi.com/star/index"
+                    "?key={}&astro={}"
+                ).format(
                     key,
                     v
                 )
@@ -29,7 +150,7 @@ def get_horoscope(config_data):
                     "User-Agent": (
                         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                         "AppleWebKit/537.36 (KHTML, like Gecko) "
-                        "Chrome/103.0.0.0 Safari/537.36"
+                        "Chrome/150.0.0.0 Safari/537.36"
                     )
                 }
 
@@ -39,35 +160,51 @@ def get_horoscope(config_data):
                     timeout=15
                 )
 
-                print("星座接口 HTTP 状态码：", r.status_code)
-                print("星座接口原始返回：", repr(r.text[:1000]))
+                print(
+                    "星座接口 HTTP 状态码：",
+                    r.status_code
+                )
 
-                if not r.text.strip():
-                    horoscope = "暂无星座运势"
-                else:
-                    response = r.json()
+                print(
+                    "星座接口原始返回：",
+                    repr(r.text[:1000])
+                )
 
-                    print("星座接口完整返回：", response)
+                response = r.json()
 
-                    if response.get("code") == 200:
-                        result = response.get("result", {})
+                if response.get("code") == 200:
 
-                        if (
-                            result
-                            and result.get("list")
-                            and len(result["list"]) > 0
-                        ):
-                            horoscope = result["list"][0].get(
-                                "content",
-                                "暂无星座运势"
-                            )
-                        else:
-                            horoscope = "暂无星座运势"
+                    result = response.get(
+                        "result",
+                        {}
+                    )
+
+                    if (
+                        result
+                        and result.get("list")
+                        and len(result["list"]) > 0
+                    ):
+
+                        horoscope = result["list"][0].get(
+                            "content",
+                            "暂无星座运势"
+                        )
+
                     else:
+
                         horoscope = "暂无星座运势"
 
+                else:
+
+                    horoscope = "暂无星座运势"
+
             except Exception as e:
-                print("星座获取异常 {}：".format(k), e)
+
+                print(
+                    "星座获取异常 {}：".format(k),
+                    e
+                )
+
                 horoscope = "暂无星座运势"
 
             horoscope_data[k] = horoscope
@@ -80,50 +217,41 @@ def get_horoscope(config_data):
 # ============================================================
 
 def yq(region, config_data):
+
     try:
-        key = config_data["weather_key"]
 
-        url = (
-            "https://geoapi.qweather.com/v2/city/lookup"
-            "?key={}&location={}"
-        ).format(
-            key,
-            region
+        response = qweather_get(
+            "/geo/v2/city/lookup",
+            config_data,
+            {
+                "location": region
+            }
         )
-
-        r = get(
-            url,
-            timeout=15
-        )
-
-        print("疫情地区查询 HTTP 状态码：", r.status_code)
-
-        if not r.text.strip():
-            print("疫情地区接口返回为空")
-            return ""
-
-        r = r.json()
 
         city = ""
 
-        if r.get("code") == "200":
-            if r.get("location"):
-                city = r["location"][0]["adm2"]
+        if response.get("code") == "200":
+
+            if response.get("location"):
+
+                city = response["location"][0]["adm2"]
 
         if not city:
+
             return ""
 
         headers = {
             "User-Agent": (
                 "Mozilla/5.0 (Linux; Android 6.0; Nexus 5 "
                 "Build/MRA58N) AppleWebKit/537.36 "
-                "(KHTML, like Gecko) Chrome/104.0.0.0 "
+                "(KHTML, like Gecko) Chrome/150.0.0.0 "
                 "Mobile Safari/537.36"
             )
         }
 
         response = get(
-            "https://covid.myquark.cn/quark/covid/data?city={}".format(city),
+            "https://covid.myquark.cn/quark/covid/data"
+            "?city={}".format(city),
             headers=headers,
             timeout=15
         ).json()
@@ -137,8 +265,11 @@ def yq(region, config_data):
             "澳门",
             "台湾"
         ]:
+
             city_data = response["provinceData"]
+
         else:
+
             city_data = response["cityData"]
 
         sure_new_loc = "昨日新增：{}".format(
@@ -170,7 +301,12 @@ def yq(region, config_data):
         )
 
     except Exception as e:
-        print("疫情数据获取失败：", e)
+
+        print(
+            "疫情数据获取失败：",
+            e
+        )
+
         yq_data = ""
 
     return yq_data
@@ -180,7 +316,10 @@ def yq(region, config_data):
 # 纪念日
 # ============================================================
 
-def get_commemoration_day(today, commemoration_day):
+def get_commemoration_day(
+    today,
+    commemoration_day
+):
 
     commemoration_year = int(
         commemoration_day.split("-")[0]
@@ -201,13 +340,18 @@ def get_commemoration_day(today, commemoration_day):
     )
 
     commemoration_days = str(
-        today.__sub__(commemoration_date)
+        today.__sub__(
+            commemoration_date
+        )
     ).split(" ")[0]
 
     return commemoration_days
 
 
-def get_commemoration_data(today, config_data):
+def get_commemoration_data(
+    today,
+    config_data
+):
 
     commemoration_days = {}
 
@@ -215,9 +359,11 @@ def get_commemoration_data(today, config_data):
 
         if k.startswith("commemoration"):
 
-            commemoration_days[k] = get_commemoration_day(
-                today,
-                v
+            commemoration_days[k] = (
+                get_commemoration_day(
+                    today,
+                    v
+                )
             )
 
     return commemoration_days
@@ -227,7 +373,10 @@ def get_commemoration_data(today, config_data):
 # 倒计时
 # ============================================================
 
-def get_countdown_data(today, config_data):
+def get_countdown_data(
+    today,
+    config_data
+):
 
     countdown_data = {}
 
@@ -260,7 +409,9 @@ def get_countdown_data(today, config_data):
             else:
 
                 countdown_data[k] = str(
-                    countdown_date.__sub__(today)
+                    countdown_date.__sub__(
+                        today
+                    )
                 ).split(" ")[0]
 
     return countdown_data
@@ -289,7 +440,8 @@ def get_color():
 
     get_colors = lambda n: list(
         map(
-            lambda i: "#" + "%06x" % random.randint(
+            lambda i:
+            "#" + "%06x" % random.randint(
                 0,
                 0xFFFFFF
             ),
@@ -299,16 +451,19 @@ def get_color():
 
     color_list = get_colors(100)
 
-    return random.choice(color_list)
+    return random.choice(
+        color_list
+    )
 
 
 # ============================================================
-# 获取微信 Access Token
+# 微信 Access Token
 # ============================================================
 
 def get_access_token(config):
 
     app_id = config["app_id"]
+
     app_secret = config["app_secret"]
 
     post_url = (
@@ -328,7 +483,10 @@ def get_access_token(config):
             timeout=15
         ).json()
 
-        print("微信 Access Token 接口返回：", response)
+        print(
+            "微信 Access Token 接口返回：",
+            response
+        )
 
         if "access_token" not in response:
 
@@ -343,9 +501,13 @@ def get_access_token(config):
 
             sys.exit(1)
 
-        access_token = response["access_token"]
+        access_token = response[
+            "access_token"
+        ]
 
-        print("✅ Access Token 获取成功")
+        print(
+            "✅ Access Token 获取成功"
+        )
 
     except Exception as e:
 
@@ -360,141 +522,40 @@ def get_access_token(config):
 
 
 # ============================================================
-# 获取天气
+# 天气
 # ============================================================
 
-def get_weather(region, config):
-
-    headers = {
-        "User-Agent": (
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-            "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/103.0.0.0 Safari/537.36"
-        )
-    }
-
-    key = config["weather_key"]
-
-    # ========================================================
-    # 1. 查询地区
-    # ========================================================
-
-    region_url = (
-        "https://geoapi.qweather.com/v2/city/lookup"
-        "?location={}&key={}"
-    ).format(
-        region,
-        key
-    )
+def get_weather(
+    region,
+    config
+):
 
     print("====================================")
     print("正在获取天气数据……")
     print("正在查询地区：", region)
     print("====================================")
 
-    try:
+    # ========================================================
+    # 1. 地区查询
+    # ========================================================
 
-        r = get(
-            region_url,
-            headers=headers,
-            timeout=15
-        )
-
-        print(
-            "和风天气地区接口 HTTP 状态码：",
-            r.status_code
-        )
-
-        print(
-            "和风天气地区接口 Content-Type：",
-            r.headers.get("Content-Type")
-        )
-
-        print(
-            "和风天气地区接口原始返回：",
-            repr(r.text[:2000])
-        )
-
-        if not r.text.strip():
-
-            print("❌ 和风天气地区接口返回为空")
-            sys.exit(1)
-
-        try:
-
-            response = r.json()
-
-        except Exception as e:
-
-            print(
-                "❌ 和风天气地区接口不是合法 JSON"
-            )
-
-            print(
-                "JSON 解析错误：",
-                e
-            )
-
-            print(
-                "实际返回内容：",
-                repr(r.text[:3000])
-            )
-
-            sys.exit(1)
-
-    except Exception as e:
-
-        print(
-            "❌ 请求和风天气地区接口失败：",
-            e
-        )
-
-        sys.exit(1)
+    response = qweather_get(
+        "/geo/v2/city/lookup",
+        config,
+        {
+            "location": region
+        }
+    )
 
     print(
         "和风天气地区查询结果：",
         response
     )
 
-    # ========================================================
-    # 判断地区查询结果
-    # ========================================================
-
-    if response.get("code") == "404":
+    if response.get("code") != "200":
 
         print(
-            "❌ 地区不存在，请检查 region：",
-            region
-        )
-
-        sys.exit(1)
-
-    elif response.get("code") == "401":
-
-        print(
-            "❌ 和风天气 Key 无效，或者没有接口权限"
-        )
-
-        print(
-            "完整返回：",
-            response
-        )
-
-        sys.exit(1)
-
-    elif response.get("code") != "200":
-
-        print(
-            "❌ 和风天气地区查询失败"
-        )
-
-        print(
-            "code：",
-            response.get("code")
-        )
-
-        print(
-            "完整返回：",
+            "❌ 地区查询失败：",
             response
         )
 
@@ -503,90 +564,50 @@ def get_weather(region, config):
     if not response.get("location"):
 
         print(
-            "❌ 和风天气没有返回 location"
-        )
-
-        print(
-            "完整返回：",
-            response
+            "❌ 和风天气没有返回地区"
         )
 
         sys.exit(1)
 
-    location_id = response["location"][0]["id"]
+    location = response["location"][0]
 
-    print("✅ 地区查询成功")
-    print("地区：", region)
-    print("Location ID：", location_id)
+    location_id = location["id"]
+
+    latitude = location["lat"]
+
+    longitude = location["lon"]
+
+    print(
+        "✅ 地区查询成功"
+    )
+
+    print(
+        "地区：",
+        region
+    )
+
+    print(
+        "Location ID：",
+        location_id
+    )
+
+    print(
+        "经纬度：",
+        latitude,
+        longitude
+    )
 
     # ========================================================
     # 2. 当前天气
     # ========================================================
 
-    weather_url = (
-        "https://devapi.qweather.com/v7/weather/now"
-        "?location={}&key={}"
-    ).format(
-        location_id,
-        key
+    response = qweather_get(
+        "/v7/weather/now",
+        config,
+        {
+            "location": location_id
+        }
     )
-
-    try:
-
-        r = get(
-            weather_url,
-            headers=headers,
-            timeout=15
-        )
-
-        print(
-            "当前天气 HTTP 状态码：",
-            r.status_code
-        )
-
-        print(
-            "当前天气原始返回：",
-            repr(r.text[:2000])
-        )
-
-        if not r.text.strip():
-
-            print(
-                "❌ 当前天气接口返回为空"
-            )
-
-            sys.exit(1)
-
-        try:
-
-            response = r.json()
-
-        except Exception as e:
-
-            print(
-                "❌ 当前天气接口不是合法 JSON"
-            )
-
-            print(
-                "JSON 解析错误：",
-                e
-            )
-
-            print(
-                "实际返回内容：",
-                repr(r.text[:3000])
-            )
-
-            sys.exit(1)
-
-    except Exception as e:
-
-        print(
-            "❌ 当前天气接口请求失败：",
-            e
-        )
-
-        sys.exit(1)
 
     if response.get("code") != "200":
 
@@ -597,22 +618,30 @@ def get_weather(region, config):
 
         sys.exit(1)
 
-    weather = response["now"]["text"]
+    now = response["now"]
+
+    weather = now.get(
+        "text",
+        ""
+    )
 
     temp = (
-        response["now"]["temp"]
+        now.get("temp", "")
         + u"\N{DEGREE SIGN}"
         + "C"
     )
 
-    wind_dir = response["now"]["windDir"]
+    wind_dir = now.get(
+        "windDir",
+        ""
+    )
 
-    rain = response["now"].get(
+    rain = now.get(
         "precip",
         "0"
     )
 
-    wet = response["now"].get(
+    wet = now.get(
         "humidity",
         ""
     )
@@ -621,55 +650,13 @@ def get_weather(region, config):
     # 3. 三天天气
     # ========================================================
 
-    url = (
-        "https://devapi.qweather.com/v7/weather/3d"
-        "?location={}&key={}"
-    ).format(
-        location_id,
-        key
+    response = qweather_get(
+        "/v7/weather/3d",
+        config,
+        {
+            "location": location_id
+        }
     )
-
-    try:
-
-        r = get(
-            url,
-            headers=headers,
-            timeout=15
-        )
-
-        print(
-            "三天天气 HTTP 状态码：",
-            r.status_code
-        )
-
-        print(
-            "三天天气原始返回：",
-            repr(r.text[:1500])
-        )
-
-        if not r.text.strip():
-
-            print(
-                "❌ 三天天气接口返回为空"
-            )
-
-            sys.exit(1)
-
-        response = r.json()
-
-    except Exception as e:
-
-        print(
-            "❌ 三天天气接口解析失败：",
-            e
-        )
-
-        print(
-            "实际返回：",
-            repr(r.text[:3000])
-        )
-
-        sys.exit(1)
 
     if response.get("code") != "200":
 
@@ -680,21 +667,35 @@ def get_weather(region, config):
 
         sys.exit(1)
 
+    daily = response["daily"][0]
+
     max_temp = (
-        response["daily"][0]["tempMax"]
+        daily.get(
+            "tempMax",
+            ""
+        )
         + u"\N{DEGREE SIGN}"
         + "C"
     )
 
     min_temp = (
-        response["daily"][0]["tempMin"]
+        daily.get(
+            "tempMin",
+            ""
+        )
         + u"\N{DEGREE SIGN}"
         + "C"
     )
 
-    sunrise = response["daily"][0]["sunrise"]
+    sunrise = daily.get(
+        "sunrise",
+        ""
+    )
 
-    sunset = response["daily"][0]["sunset"]
+    sunset = daily.get(
+        "sunset",
+        ""
+    )
 
     # ========================================================
     # 4. 紫外线
@@ -704,28 +705,23 @@ def get_weather(region, config):
 
     try:
 
-        index_url = (
-            "https://devapi.qweather.com/v7/indices/1d"
-            "?location={}&key={}&type=5"
-        ).format(
-            location_id,
-            key
+        response = qweather_get(
+            "/v7/indices/1d",
+            config,
+            {
+                "location": location_id,
+                "type": "5"
+            }
         )
 
-        r = get(
-            index_url,
-            headers=headers,
-            timeout=15
-        )
+        if response.get("code") == "200":
 
-        index_resp = r.json()
+            if response.get("daily"):
 
-        if index_resp.get("code") == "200":
-
-            uv = index_resp["daily"][0].get(
-                "level",
-                "无"
-            )
+                uv = response["daily"][0].get(
+                    "level",
+                    "无"
+                )
 
     except Exception as e:
 
@@ -742,28 +738,22 @@ def get_weather(region, config):
 
     try:
 
-        hourly_url = (
-            "https://devapi.qweather.com/v7/weather/24h"
-            "?location={}&key={}"
-        ).format(
-            location_id,
-            key
+        response = qweather_get(
+            "/v7/weather/24h",
+            config,
+            {
+                "location": location_id
+            }
         )
 
-        r = get(
-            hourly_url,
-            headers=headers,
-            timeout=15
-        )
+        if response.get("code") == "200":
 
-        hourly_resp = r.json()
+            if response.get("hourly"):
 
-        if hourly_resp.get("code") == "200":
-
-            rain_prob = hourly_resp["hourly"][0].get(
-                "pop",
-                ""
-            )
+                rain_prob = response["hourly"][0].get(
+                    "pop",
+                    ""
+                )
 
     except Exception as e:
 
@@ -780,21 +770,13 @@ def get_weather(region, config):
 
     try:
 
-        url = (
-            "https://devapi.qweather.com/v7/air/now"
-            "?location={}&key={}"
-        ).format(
-            location_id,
-            key
+        response = qweather_get(
+            "/v7/air/now",
+            config,
+            {
+                "location": location_id
+            }
         )
-
-        r = get(
-            url,
-            headers=headers,
-            timeout=15
-        )
-
-        response = r.json()
 
         if response.get("code") == "200":
 
@@ -823,29 +805,23 @@ def get_weather(region, config):
             16
         )
 
-        url = (
-            "https://devapi.qweather.com/v7/indices/1d"
-            "?location={}&key={}&type={}"
-        ).format(
-            location_id,
-            key,
-            index_type
+        response = qweather_get(
+            "/v7/indices/1d",
+            config,
+            {
+                "location": location_id,
+                "type": str(index_type)
+            }
         )
-
-        r = get(
-            url,
-            headers=headers,
-            timeout=15
-        )
-
-        response = r.json()
 
         if response.get("code") == "200":
 
-            proposal = response["daily"][0].get(
-                "text",
-                ""
-            )
+            if response.get("daily"):
+
+                proposal = response["daily"][0].get(
+                    "text",
+                    ""
+                )
 
     except Exception as e:
 
@@ -855,7 +831,7 @@ def get_weather(region, config):
         )
 
     # ========================================================
-    # 天气数据完成
+    # 完成
     # ========================================================
 
     print("====================================")
@@ -893,7 +869,7 @@ def get_weather(region, config):
 
 
 # ============================================================
-# 天行彩虹屁
+# 彩虹屁
 # ============================================================
 
 def get_tianhang(config):
@@ -913,7 +889,7 @@ def get_tianhang(config):
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/103.0.0.0 Safari/537.36"
+                "Chrome/150.0.0.0 Safari/537.36"
             )
         }
 
@@ -932,10 +908,6 @@ def get_tianhang(config):
             "天行彩虹屁原始返回：",
             repr(r.text[:1500])
         )
-
-        if not r.text.strip():
-
-            return ""
 
         response = r.json()
 
@@ -970,7 +942,11 @@ def get_tianhang(config):
 # 生日
 # ============================================================
 
-def get_birthday(birthday, year, today):
+def get_birthday(
+    birthday,
+    year,
+    today
+):
 
     birthday_year = birthday.split("-")[0]
 
@@ -1041,7 +1017,9 @@ def get_birthday(birthday, year, today):
             )
 
         birth_day = str(
-            birth_date.__sub__(today)
+            birth_date.__sub__(
+                today
+            )
         ).split(" ")[0]
 
     elif today == year_date:
@@ -1053,19 +1031,22 @@ def get_birthday(birthday, year, today):
         birth_date = year_date
 
         birth_day = str(
-            birth_date.__sub__(today)
+            birth_date.__sub__(
+                today
+            )
         ).split(" ")[0]
 
     return birth_day
 
 
 # ============================================================
-# 金山词霸每日一句
+# 金山词霸
 # ============================================================
 
 def get_ciba():
 
     note_ch = ""
+
     note_en = ""
 
     try:
@@ -1077,7 +1058,7 @@ def get_ciba():
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/103.0.0.0 Safari/537.36"
+                "Chrome/150.0.0.0 Safari/537.36"
             )
         }
 
@@ -1110,6 +1091,7 @@ def get_ciba():
 def get_tian_note(config):
 
     note_ch = ""
+
     note_en = ""
 
     try:
@@ -1118,14 +1100,6 @@ def get_tian_note(config):
             "tian_api",
             ""
         )
-
-        if not key:
-
-            print(
-                "【警告】tian_api为空，跳过天行金句"
-            )
-
-            return note_ch, note_en
 
         url = (
             "https://apis.tianapi.com/everyday/index"
@@ -1138,7 +1112,7 @@ def get_tian_note(config):
             "User-Agent": (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
                 "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/103.0.0.0 Safari/537.36"
+                "Chrome/150.0.0.0 Safari/537.36"
             )
         }
 
@@ -1160,22 +1134,6 @@ def get_tian_note(config):
 
         result = response.json()
 
-        # ====================================================
-        # 天行 everyday 当前返回结构：
-        #
-        # result:
-        # {
-        #     "id": ...,
-        #     "content": "...",
-        #     "note": "...",
-        #     "source": "...",
-        #     "date": "..."
-        # }
-        #
-        # 注意：
-        # 这里没有 result["list"]
-        # ====================================================
-
         if (
             result.get("code") == 200
             and result.get("result")
@@ -1191,27 +1149,6 @@ def get_tian_note(config):
             note_ch = item.get(
                 "note",
                 ""
-            )
-
-            print(
-                "✅ 天行金句解析成功"
-            )
-
-            print(
-                "中文：",
-                note_ch
-            )
-
-            print(
-                "英文：",
-                note_en
-            )
-
-        else:
-
-            print(
-                "❌ 天行金句接口返回异常：",
-                result
             )
 
     except Exception as e:
@@ -1281,15 +1218,15 @@ def send_message(
     os.environ["TZ"] = "Asia/Shanghai"
 
     year = localtime().tm_year
+
     month = localtime().tm_mon
+
     day = localtime().tm_mday
 
-    today = datetime.date(
-        datetime(
-            year=year,
-            month=month,
-            day=day
-        )
+    today = date(
+        year,
+        month,
+        day
     )
 
     week = week_list[
@@ -1582,7 +1519,7 @@ def send_message(
         }
 
     # ========================================================
-    # 发送
+    # 发送微信
     # ========================================================
 
     headers = {
@@ -1590,7 +1527,7 @@ def send_message(
         "User-Agent": (
             "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
             "AppleWebKit/537.36 (KHTML, like Gecko) "
-            "Chrome/103.0.0.0 Safari/537.36"
+            "Chrome/150.0.0.0 Safari/537.36"
         )
     }
 
@@ -1619,14 +1556,6 @@ def send_message(
             r.text
         )
 
-        if not r.text.strip():
-
-            print(
-                "❌ 微信接口返回为空"
-            )
-
-            sys.exit(1)
-
         response = r.json()
 
     except Exception as e:
@@ -1652,115 +1581,31 @@ def send_message(
         ""
     )
 
-    # ========================================================
-    # 微信错误处理
-    # ========================================================
+    if errcode == 0:
 
-    if errcode == 40037:
-
-        print(
-            "❌ 推送消息失败：模板 ID 无效"
-        )
-
-        print(
-            "当前模板 ID：",
-            config.get("template_id")
-        )
-
-        print(
-            "微信 errmsg：",
-            errmsg
-        )
-
-        sys.exit(1)
-
-    elif errcode == 40036:
-
-        print(
-            "❌ 推送消息失败：模板 ID 为空"
-        )
-
-        print(
-            "微信 errmsg：",
-            errmsg
-        )
-
-        sys.exit(1)
-
-    elif errcode == 40003:
-
-        print(
-            "❌ 推送消息失败：微信用户 ID 错误"
-        )
-
-        print(
-            "当前用户：",
-            to_user
-        )
-
-        print(
-            "微信 errmsg：",
-            errmsg
-        )
-
-        sys.exit(1)
-
-    elif errcode == 43004:
-
-        print(
-            "❌ 推送消息失败：用户取消关注公众号"
-        )
-
-        print(
-            "微信 errmsg：",
-            errmsg
-        )
-
-        sys.exit(1)
-
-    elif errcode == 0:
-
-        print(
-            "===================================="
-        )
-
-        print(
-            "✅ 微信模板消息推送成功！"
-        )
-
-        print(
-            "===================================="
-        )
+        print("====================================")
+        print("✅ 微信模板消息推送成功！")
+        print("====================================")
 
     else:
 
-        print(
-            "❌ 微信模板消息推送失败"
-        )
-
-        print(
-            "errcode：",
-            errcode
-        )
-
-        print(
-            "errmsg：",
-            errmsg
-        )
-
-        print(
-            "完整返回：",
-            response
-        )
+        print("====================================")
+        print("❌ 微信模板消息推送失败")
+        print("errcode：", errcode)
+        print("errmsg：", errmsg)
+        print("====================================")
 
         sys.exit(1)
 
 
 # ============================================================
-# 主处理函数
+# 主处理
 # ============================================================
 
-def handler(event, context):
+def handler(
+    event,
+    context
+):
 
     # ========================================================
     # 读取配置
@@ -1780,8 +1625,7 @@ def handler(event, context):
     except FileNotFoundError:
 
         print(
-            "❌ 推送消息失败："
-            "请检查 config.txt 是否与 main.py 位于同一路径"
+            "❌ 找不到 config.txt"
         )
 
         sys.exit(1)
@@ -1789,8 +1633,7 @@ def handler(event, context):
     except SyntaxError:
 
         print(
-            "❌ 推送消息失败："
-            "请检查 config.txt 文件格式是否正确，不要带 # 注释"
+            "❌ config.txt 格式错误"
         )
 
         sys.exit(1)
@@ -1807,6 +1650,38 @@ def handler(event, context):
     print("====================================")
     print("开始执行每日推送")
     print("====================================")
+
+    # ========================================================
+    # 检查 API Host
+    # ========================================================
+
+    qweather_api_host = config.get(
+        "qweather_api_host",
+        ""
+    ).strip()
+
+    if not qweather_api_host:
+
+        print("❌ 缺少 qweather_api_host")
+        print("")
+        print("请在 config.txt 中加入：")
+        print(
+            '"qweather_api_host": "你的专属API Host",'
+        )
+        print("")
+        print(
+            "例如："
+        )
+        print(
+            '"qweather_api_host": "abc123.xx.qweatherapi.com",'
+        )
+
+        sys.exit(1)
+
+    print(
+        "和风天气 API Host：",
+        qweather_api_host
+    )
 
     # ========================================================
     # 微信 Access Token
@@ -1852,7 +1727,7 @@ def handler(event, context):
     )
 
     # ========================================================
-    # 每日金句
+    # 每日一句
     # ========================================================
 
     note_ch, note_en = get_tian_note(
@@ -1860,10 +1735,6 @@ def handler(event, context):
     )
 
     if not note_ch or not note_en:
-
-        print(
-            "天行金句为空，尝试词霸兜底"
-        )
 
         note_ch, note_en = get_ciba()
 
@@ -1874,20 +1745,6 @@ def handler(event, context):
     if not note_en:
 
         note_en = "Keep loving, keep going."
-
-    print(
-        "📤最终准备发送金句："
-    )
-
-    print(
-        "中文：",
-        note_ch
-    )
-
-    print(
-        "英文：",
-        note_en
-    )
 
     # ========================================================
     # 彩虹屁
@@ -1915,7 +1772,7 @@ def handler(event, context):
     )
 
     # ========================================================
-    # 发送
+    # 微信推送
     # ========================================================
 
     for user in users:

@@ -10,7 +10,6 @@ import os
 
 def get_horoscope(config_data):
     horoscope_data = {}
-    # 遍历config里面所有horoscope开头的配置，例如 horoscope1: "taurus"
     for k, v in config_data.items():
         if k.startswith("horoscope"):
             try:
@@ -20,8 +19,13 @@ def get_horoscope(config_data):
                     'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
                 }
                 response = get(url, headers=headers, timeout=10).json()
-                if response["code"] == 200:
-                    horoscope = response["newslist"][0]["content"]
+                print(f"星座接口完整返回：{response}")
+                if response.get("code") == 200:
+                    # ✅新域名apis.tianapi.com：数据在 result -> list[0]
+                    if response.get("result") and response["result"].get("list") and len(response["result"]["list"])>0:
+                        horoscope = response["result"]["list"][0]["content"]
+                    else:
+                        horoscope = "暂无星座运势"
                 else:
                     horoscope = "暂无星座运势"
             except Exception as e:
@@ -170,10 +174,9 @@ def get_weather(region, config):
 
     url = "https://devapi.qweather.com/v7/air/now?location={}&key={}".format(location_id, key)
     response = get(url, headers=headers, timeout=10).json()
+    pm2p5 = ""
     if response["code"] == "200":
         pm2p5 = response["now"]["pm2p5"]
-    else:
-        pm2p5 = ""
 
     id = random.randint(1, 16)
     url = "https://devapi.qweather.com/v7/indices/1d?location={}&key={}&type={}".format(location_id, key, id)
@@ -193,8 +196,8 @@ def get_tianhang(config):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
         }
         response = get(url, headers=headers, timeout=10).json()
-        if response["code"] == 200:
-            chp = response["newslist"][0]["content"]
+        if response["code"] == 200 and response.get("result") and response["result"].get("list"):
+            chp = response["result"]["list"][0]["content"]
         else:
             chp = ""
     except Exception:
@@ -248,7 +251,7 @@ def get_ciba():
         print("词霸获取失败：", e)
     return note_ch, note_en
 
-# =========修复天行每日英语 【重点！天行everyday返回newslist数组】=========
+
 def get_tian_note(config):
     note_ch = ""
     note_en = ""
@@ -257,7 +260,6 @@ def get_tian_note(config):
         if not key:
             print("【警告】tian_api为空，跳过天行金句")
             return note_ch, note_en
-
         url = "https://apis.tianapi.com/everyday/index?key={}".format(key)
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
@@ -265,19 +267,15 @@ def get_tian_note(config):
         response = get(url, headers=headers, timeout=10)
         print("天行金句接口原始返回：", response.text)
         result = response.json()
-
-        if result.get("code") == 200:
-            if result.get("newslist") and len(result["newslist"]) > 0:
-                item = result["newslist"][0]
-                note_en = item.get("content", "")
-                note_ch = item.get("note", "")
+        if result.get("code") == 200 and result.get("result") and result["result"].get("list"):
+            item = result["result"]["list"][0]
+            note_en = item.get("content", "")
+            note_ch = item.get("note", "")
             print(f"✅天行金句解析成功：中文：{note_ch}，英文：{note_en}")
         else:
             print(f"❌天行金句接口返回code异常：{result}")
     except Exception as e:
         print(f"❌天行金句获取异常：{e}")
-
-    # 兜底默认文案
     if not note_ch:
         note_ch = "保持热爱，奔赴山海"
     if not note_en:
@@ -310,94 +308,33 @@ def send_message(to_user, access_token, region_name, weather, temp, wind_dir, ra
         "url": "http://weixin.qq.com/download",
         "topcolor": "#FF0000",
         "data": {
-            "date": {
-                "value": "{} {}".format(today, week),
-                "color": color("color_date", config)
-            },
-            "region": {
-                "value": region_name,
-                "color": color("color_region", config)
-            },
-            "weather": {
-                "value": weather,
-                "color": color("color_weather", config)
-            },
-            "temp": {
-                "value": temp,
-                "color": color("color_temp", config)
-            },
-            "wind": {
-                "value": wind_dir,
-                "color": color("color_wind", config)
-            },
-            "rain": {
-                "value": rain,
-                "color": color("color_weather", config)
-            },
-            "rain_prob": {
-                "value": rain_prob,
-                "color": color("color_weather", config)
-            },
-            "wet": {
-                "value": wet,
-                "color": color("color_weather", config)
-            },
-            "uv": {
-                "value": uv,
-                "color": color("color_weather", config)
-            },
-            "note_en": {
-                "value": note_en,
-                "color": color("color_note_en", config)
-            },
-            "note_ch": {
-                "value": note_ch,
-                "color": color("color_note_ch", config)
-            },
-            "max_temp": {
-                "value": max_temp,
-                "color": color("color_max_temp", config)
-            },
-            "min_temp": {
-                "value": min_temp,
-                "color": color("color_min_temp", config)
-            },
-            "sunrise": {
-                "value": sunrise,
-                "color": color("color_sunrise", config)
-            },
-            "sunset": {
-                "value": sunset,
-                "color": color("color_sunset", config)
-            },
-            "pm2p5": {
-                "value": pm2p5,
-                "color": color("color_pm2p5", config)
-            },
-            "proposal": {
-                "value": proposal,
-                "color": color("color_proposal", config)
-            },
-            "chp": {
-                "value": chp,
-                "color": color("color_chp", config)
-            },
-            "yq": {
-                "value": yq,
-                "color": color("color_yq", config)
-            },
+            "date": {"value": "{} {}".format(today, week), "color": color("color_date", config)},
+            "region": {"value": region_name, "color": color("color_region", config)},
+            "weather": {"value": weather, "color": color("color_weather", config)},
+            "temp": {"value": temp, "color": color("color_temp", config)},
+            "wind": {"value": wind_dir, "color": color("color_wind", config)},
+            "rain": {"value": rain, "color": color("color_weather", config)},
+            "rain_prob": {"value": rain_prob, "color": color("color_weather", config)},
+            "wet": {"value": wet, "color": color("color_weather", config)},
+            "uv": {"value": uv, "color": color("color_weather", config)},
+            "note_en": {"value": note_en, "color": color("color_note_en", config)},
+            "note_ch": {"value": note_ch, "color": color("color_note_ch", config)},
+            "max_temp": {"value": max_temp, "color": color("color_max_temp", config)},
+            "min_temp": {"value": min_temp, "color": color("color_min_temp", config)},
+            "sunrise": {"value": sunrise, "color": color("color_sunrise", config)},
+            "sunset": {"value": sunset, "color": color("color_sunset", config)},
+            "pm2p5": {"value": pm2p5, "color": color("color_pm2p5", config)},
+            "proposal": {"value": proposal, "color": color("color_proposal", config)},
+            "chp": {"value": chp, "color": color("color_chp", config)},
+            "yq": {"value": yq, "color": color("color_yq", config)},
         }
     }
-    # 星座数据注入
     for key, value in horoscope_data.items():
         data["data"][key] = {"value": value, "color": color(f"color_{key}", config)}
-    # 纪念日
     for key, value in commemoration_data.items():
         data["data"][key] = {"value": value, "color": color(f"color_{key}", config)}
-    # 倒计时
     for key, value in countdown_data.items():
         data["data"][key] = {"value": value, "color": color(f"color_{key}", config)}
-    # 生日
     for key, value in birthdays.items():
         birth_day = get_birthday(value["birthday"], year, today)
         if birth_day == 0:
@@ -445,13 +382,10 @@ def handler(event, context):
     region = config["region"]
     weather, temp, max_temp, min_temp, wind_dir, rain, rain_prob, wet, uv, sunrise, sunset, pm2p5, proposal = get_weather(region, config)
 
-    # 天行金句优先
     note_ch, note_en = get_tian_note(config)
-    # 天行失败，词霸兜底
     if not note_ch or not note_en:
         print("天行金句为空，尝试词霸兜底")
         note_ch, note_en = get_ciba()
-    # 兜底默认文案
     if not note_ch:
         note_ch = "保持热爱，奔赴山海"
     if not note_en:

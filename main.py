@@ -306,25 +306,32 @@ def get_ciba():
 
 
 def get_tian_note(config):
-    """天行每日一句（中英对照），作为金句备选"""
-    note_ch = ""
-    note_en = ""
+    """天行新版每日英语，获取中英金句"""
+    note_ch = "" #中文
+    note_en = "" #英文
     try:
         key = config.get("tian_api", "")
         if not key:
             return note_ch, note_en
-        url = "http://api.tianapi.com/everyday/index?key={}".format(key)
+        # 新版接口地址 apis.tianapi.com
+        url = "https://apis.tianapi.com/everyday/index?key={}".format(key)
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) '
                           'AppleWebKit/537.36 (KHTML, like Gecko) Chrome/103.0.0.0 Safari/537.36',
         }
         response = get(url, headers=headers, timeout=10).json()
-        if response.get("code") == 200 and response.get("newslist"):
-            note_ch = response["newslist"][0].get("content", "")
-            note_en = response["newslist"][0].get("english", "")
+        if response.get("code") == 200 and response.get("result"):
+            note_en = response["result"]["content"] #英文
+            note_ch = response["result"]["note"]     #中文
     except Exception as e:
         print("天行金句接口获取失败：", e)
+    #兜底默认文案，防止空
+    if not note_ch:
+        note_ch = "保持热爱，奔赴山海"
+    if not note_en:
+        note_en = "Keep loving, keep going."
     return note_ch, note_en
+
 
 
 def send_message(to_user, access_token, region_name, weather, temp, wind_dir, rain, rain_prob, wet, uv,
